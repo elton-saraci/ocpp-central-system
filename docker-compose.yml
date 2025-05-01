@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  central-system:
+    build: .
+    container_name: charge-point-central-system
+    ports:
+      - "8080:8080"   # Map port 9090 of the container to port 9090 on the host machine
+      - "7070:7070"   # Map port 9090 of the container to port 9090 on the host machine
+    volumes:
+      - ./logs:/app/logs
+    restart: always
