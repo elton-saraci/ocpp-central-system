@@ -81,6 +81,7 @@ docker-compose.yml                    # Multi-container orchestration
 * API responses do not yet follow a consistent structure (e.g. error codes or response envelope).
 * WebSocket resilience (e.g. reconnections, pings, error recovery) needs enhancement.
 * This project is under active development.
+* No written tests yet.
 
 Community contributions to improve error handling, response structure, and WebSocket robustness are highly welcome!
 
