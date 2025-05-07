@@ -1,35 +1,35 @@
 # OCPP Central System
 
-**OCPP Central System** is an open-source, Spring Boot-based backend service designed to manage EV charge stations via WebSocket communication, compliant with the [OCPP 1.6 protocol](https://www.openchargealliance.org/protocols/ocpp-16/).\
+**OCPP Central System** is an open-source, Spring Boot-based backend service designed to manage EV charge stations via WebSocket communication, compliant with the [OCPP 1.6 protocol](https://www.openchargealliance.org/protocols/ocpp-16/).
 This service acts as a central system to communicate with charge points, process transaction data, and monitor station status in real-time.
 
 ---
 
 ## ⚙️ Features
 
-- **WebSocket support for OCPP 1.6** using [Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP)
-- **Charge Point Management**
-- **Transaction Lifecycle Management** (Start / Stop / MeterValues)
-- **Authorization and Heartbeat Handling**
-- **BootNotification and StatusNotification Processing**
-- **REST API for Charge Points and Transactions**
-- **H2 in-memory database** for quick startup and testing
-- **OpenAPI (Swagger UI)** integration for API documentation
-- **Docker and Docker Compose support** for simplified containerized deployment
+* **WebSocket support for OCPP 1.6** using [Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP)
+* **Charge Point Management** with remote trigger capabilities (reset, unlock, status notifications, heartbeat, meter values, configuration change)
+* **Transaction Lifecycle Management** (Start / Stop / MeterValues)
+* **Authorization and Heartbeat Handling**
+* **BootNotification and StatusNotification Processing**
+* **REST API for Charge Points and Transactions**
+* **H2 in-memory database** for quick startup and testing
+* **OpenAPI (Swagger UI)** integration for API documentation
+* **Docker and Docker Compose support** for simplified containerized deployment
 
 ---
 
 ## 📦 Technologies Used
 
-- Java 17
-- Spring Boot 3.2
-- Java-OCA-OCPP
-- Spring Web / Spring Data JPA
-- H2 Database
-- Lombok
-- MapStruct
-- OpenAPI (springdoc-openapi)
-- Docker
+* Java 17
+* Spring Boot 3.2
+* Java-OCA-OCPP
+* Spring Web / Spring Data JPA
+* H2 Database
+* Lombok
+* MapStruct
+* OpenAPI (springdoc-openapi)
+* Docker
 
 ---
 
@@ -49,41 +49,41 @@ src/
 │   │   └── util/                     # Utility classes (e.g. meter value parsing)
 │   └── resources/
 │       └── application.yml           # Configuration file
-Dockerfile                            # Docker build definition (still need to enhance it)
+Dockerfile                            # Docker build definition
 docker-compose.yml                    # Multi-container orchestration
 ```
 
 ---
 
-## 📱 WebSocket Integration
+## 🔌 REST API Endpoints
 
-The OCPP 1.6 protocol is handled via `ServerCoreEventHandler`, which maps all core OCPP messages such as:
-
-- `AuthorizeRequest`
-- `BootNotificationRequest`
-- `StartTransactionRequest`
-- `StopTransactionRequest`
-- `MeterValuesRequest`
-- `StatusNotificationRequest`
-- `HeartbeatRequest`
-
-This handler is exposed as a Spring `@Bean` and registered via the `ServerCoreProfile`.
-
-> ⚠️ **Note**: WebSocket connection handling is still basic and may require improvements for production-grade robustness.
+| Endpoint                                     | Method | Description                                 |
+| -------------------------------------------- | ------ | ------------------------------------------- |
+| `/charge-point`                              | GET    | List all registered charge points           |
+| `/charge-point/{cpId}/hard-reset`            | POST   | Trigger a hard reset on charge point        |
+| `/charge-point/{cpId}/soft-reset`            | POST   | Trigger a soft reset on charge point        |
+| `/charge-point/{cpId}/connector-unlock`      | POST   | Unlock a specific connector on charge point |
+| `/charge-point/{cpId}/status-notification`   | POST   | Trigger status notification request         |
+| `/charge-point/{cpId}/boot-notification`     | POST   | Trigger boot notification request           |
+| `/charge-point/{cpId}/heartbeat`             | POST   | Trigger heartbeat request                   |
+| `/charge-point/{cpId}/meter-values`          | POST   | Trigger meter values request                |
+| `/charge-point/{cpId}/change-configurations` | POST   | Change configuration key on charge point    |
+| `/charge-transaction`                        | GET    | List all transactions                       |
+| `/charge-transaction/{id}`                   | GET    | Get transaction by ID                       |
+| `/charge-transaction/start`                  | POST   | Start a new charging session                |
+| `/charge-transaction/stop/{id}`              | POST   | Stop an existing transaction                |
 
 ---
 
-## 🔌 REST API Endpoints
+## ⚠️ Known Limitations
 
-| Endpoint                        | Method | Description                       |
-| ------------------------------- | ------ | --------------------------------- |
-| `/charge-point`                 | GET    | List all registered charge points |
-| `/charge-transaction`           | GET    | List all transactions             |
-| `/charge-transaction/{id}`      | GET    | Get transaction by ID             |
-| `/charge-transaction/start`     | POST   | Start a new charging session      |
-| `/charge-transaction/stop/{id}` | POST   | Stop an existing transaction      |
+* Error handling is currently minimal and not standardized.
+* API responses do not yet follow a consistent structure (e.g. error codes or response envelope).
+* WebSocket resilience (e.g. reconnections, pings, error recovery) needs enhancement.
+* This project is under active development.
+* No written tests yet.
 
-Full API documentation is available via Swagger UI.
+Community contributions to improve error handling, response structure, and WebSocket robustness are highly welcome!
 
 ---
 
@@ -91,8 +91,8 @@ Full API documentation is available via Swagger UI.
 
 ### Prerequisites
 
-- Java 17+
-- Maven 3+
+* Java 17+
+* Maven 3+
 
 ### Run the application
 
@@ -108,8 +108,8 @@ docker-compose up --build
 
 ### Access the APIs
 
-- Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-- H2 Console (if enabled): [http://localhost:8080/h2-console](http://localhost:8080/h2-console)
+* Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+* H2 Console (if enabled): [http://localhost:8080/h2-console](http://localhost:8080/h2-console)
 
 ---
 
@@ -120,17 +120,6 @@ Run all unit tests using:
 ```bash
 mvn test
 ```
-
----
-
-## ⚠️ Known Limitations
-
-- Error handling is currently minimal and not standardized.
-- API responses do not yet follow a consistent structure (e.g. error codes or response envelope).
-- WebSocket resilience (e.g. reconnections, pings, error recovery) needs enhancement.
-- This project is under active development.
-
-Community contributions to improve error handling, response structure, and WebSocket robustness are highly welcome!
 
 ---
 
@@ -149,4 +138,3 @@ Contributions are welcome! Please fork the repository, open an issue, or submit 
 ## 🌐 Repository Origin
 
 > This project builds on and integrates [ChargeTime's Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) library for OCPP 1.6 protocol support.
-
