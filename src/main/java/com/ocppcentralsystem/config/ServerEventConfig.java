@@ -41,7 +41,7 @@ public class ServerEventConfig {
 			@Override
 			public void newSession(UUID websocketId, SessionInformation information) {
 				try {
-					log.info("New Session established, sessionIndex -> {}, sessionInformation -> {}", websocketId, information);
+					log.info("New Session established, sessionIndex -> {}, sessionIdentifier -> {}", websocketId, information.getIdentifier());
 					String cpId = information.getIdentifier().substring(1);
 					ChargePoint chargePoint = new ChargePoint(cpId, websocketId, new HashMap<>(), WebsocketConnectionStatus.OPEN, LocalDateTime.now());
 					chargePointRepository.save(chargePoint);
