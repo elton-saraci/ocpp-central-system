@@ -12,6 +12,19 @@ spring:
     console:
       enabled: true
       path: /h2-console
+  ai:
+    mcp:
+      server:
+        name: ocpp-central-system-mcp
+        version: 0.0.1
+        type: sync
+        protocol: STATELESS
+        stateless:
+          mcp-endpoint: /mcp
+
+logging:
+  level:
+    io.modelcontextprotocol.server.DefaultMcpStatelessServerHandler: ERROR
 
 tags: tag1, tag2, tag3
 
