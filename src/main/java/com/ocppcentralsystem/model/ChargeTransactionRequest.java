@@ -2,9 +2,11 @@ package com.ocppcentralsystem.model;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
+@AllArgsConstructor
 public class ChargeTransactionRequest {
 
     @NotBlank(message = "cpId is required")
