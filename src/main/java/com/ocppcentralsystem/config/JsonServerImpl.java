@@ -20,8 +20,9 @@ public class JsonServerImpl {
     @PostConstruct
     public void startServer() {
         try {
-            log.info("Starting JSON server (websocket) on port: {}", applicationConfiguration.getWebsocketPort());
-            server.open("localhost", applicationConfiguration.getWebsocketPort(), serverEvents);
+            log.info("Starting JSON server (websocket) on host: {} port: {}",
+                    applicationConfiguration.getWebsocketHost(), applicationConfiguration.getWebsocketPort());
+            server.open(applicationConfiguration.getWebsocketHost(), applicationConfiguration.getWebsocketPort(), serverEvents);
         } catch (Exception e) {
             log.error("Exception while starting the server, error message: " + e.getLocalizedMessage());
         }
