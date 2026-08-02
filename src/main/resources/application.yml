@@ -28,22 +28,20 @@ logging:
 
 tags: tag1, tag2, tag3
 
-# ── Ports ──────────────────────────────────────────────────────────────
-# Only ONE port is exposed to the outside world: public.port.
-# The other two are internal backends reachable only via the router.
+# ── Ports (default: two-port mode, router OFF) ─────────────────────────
+# Default setup exposes both ports directly, e.g. local Docker or a VM with
+# the firewall open for 7070 + 8080. The SinglePortRouter bean is disabled
+# unless the "single-port" profile is active.
 #
-#   public.port    the single "front door". On Render this is $PORT;
-#                  locally it defaults to 7070. Every connection lands here
-#                  and the SinglePortRouter sends WebSocket upgrades to the
-#                  OCPP server and everything else to Tomcat.
-#   websocket.port internal OCPP server (charge point WebSocket endpoint).
-#   server.port    internal Spring Boot / Tomcat (REST API, Swagger, H2, MCP).
+#   server.port    Spring Boot / Tomcat (REST API, Swagger, H2, MCP) - public
+#   websocket.port OCPP server (charge point WebSocket endpoint) - public
+#
+# To run on a platform that only exposes ONE port (e.g. Render), activate the
+# "single-port" profile with SPRING_PROFILES_ACTIVE=single-port
+# (see application-single-port.yml).
 # ───────────────────────────────────────────────────────────────────────
+server:
+  port: 7070
+
 websocket:
   port: 8080
-
-public:
-  port: ${PORT:7070}
-
-server:
-  port: 8081

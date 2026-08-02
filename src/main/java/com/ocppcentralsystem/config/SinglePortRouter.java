@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
@@ -27,8 +28,14 @@ import java.nio.charset.StandardCharsets;
  * their OCPP upgrade request is forwarded to the OCPP server on
  * {@code websocket.port}, while normal REST traffic goes to the HTTP server
  * on {@code server.port}.
+ *
+ * <p>Enabled only when the "single-port" Spring profile is active
+ * (router.enabled=true, see application-single-port.yml). Platforms that can
+ * expose multiple ports (local Docker, VMs, etc.) leave it disabled and run
+ * the plain two-port setup instead.
  */
 @Slf4j
+@ConditionalOnProperty(prefix = "router", name = "enabled", havingValue = "true", matchIfMissing = false)
 @Component
 public class SinglePortRouter implements ApplicationRunner {
 

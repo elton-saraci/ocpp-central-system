@@ -18,9 +18,10 @@ RUN mvn -B -DskipTests package
 # ---- Runtime stage ----
 FROM eclipse-temurin:17-jre
 
-# Create config directory and copy the application.yml into it
+# Create config directory and copy the application.yml files into it
 RUN mkdir /config
 COPY src/main/resources/application.yml /config/application.yml
+COPY src/main/resources/application-single-port.yml /config/application-single-port.yml
 
 # Copy the JAR produced by the build stage
 COPY --from=build /app/target/*.jar /app.jar

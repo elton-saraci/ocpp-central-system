@@ -1,0 +1,22 @@
+# ── Single-port mode (for platforms that expose only ONE port, e.g. Render) ──
+# Activate with the environment variable: SPRING_PROFILES_ACTIVE=single-port
+#
+# The SinglePortRouter binds the single public port and dispatches each
+# connection: WebSocket upgrades go to the OCPP server, everything else goes
+# to Tomcat.
+#
+#   public.port    the one public port (on Render this becomes $PORT)
+#   server.port    internal Spring Boot / Tomcat (reachable only via the router)
+#   websocket.port internal OCPP server (inherited from application.yml = 8080)
+#
+# Charge points connect to:  wss://<host>/OCPP16/<chargePointId>
+# REST API stays on:         https://<host>/...
+# ───────────────────────────────────────────────────────────────────────
+router:
+  enabled: true
+
+public:
+  port: ${PORT:7070}
+
+server:
+  port: 8081
