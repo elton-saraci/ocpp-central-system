@@ -143,6 +143,29 @@ class TagServiceIntegrationTest {
         assertTrue(reloaded.getLastUpdated().isAfter(stale));
     }
 
+    @Test
+    void tagListAppliesOnlyTheFiltersThatWereGiven() {
+        tagService.createTag(request("FILTER-ACTIVE", "Alice Anderson", TagType.RFID, null));
+        tagService.createTag(request("FILTER-BLOCKED", "Bob Brown", TagType.RFID, null));
+        tagService.createTag(request("FILTER-APP", "Carol Clark", TagType.APP, null));
+        tagService.updateTagStatus("FILTER-BLOCKED", TagStatus.BLOCKED);
+
+        assertEquals(3, tagService.findAllTags(null, null, null).size());
+        assertEquals(2, tagService.findAllTags(TagStatus.ACTIVE, null, null).size());
+        assertEquals(1, tagService.findAllTags(null, TagType.APP, null).size());
+        assertEquals(1, tagService.findAllTags(TagStatus.BLOCKED, TagType.RFID, null).size());
+
+        // search matches the customer name or the tag identifier, ignoring case
+        assertEquals(1, tagService.findAllTags(null, null, "anderson").size());
+        assertEquals(1, tagService.findAllTags(null, null, "FILTER-APP").size());
+        assertEquals(3, tagService.findAllTags(null, null, "filter-").size());
+        assertEquals(1, tagService.findAllTags(TagStatus.BLOCKED, null, "bob").size());
+
+        assertTrue(tagService.findAllTags(null, null, "nobody").isEmpty());
+        assertTrue(tagService.findAllTags(TagStatus.BLOCKED, TagType.APP, null).isEmpty());
+        assertEquals("Alice Anderson", tagService.findAllTags(null, null, null).get(0).getCustomerName());
+    }
+
     private TagRequest request(String idTag, String customerName, TagType tagType, LocalDateTime expiryDate) {
         return new TagRequest(idTag, customerName, null, null, tagType, expiryDate, null);
     }

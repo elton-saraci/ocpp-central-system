@@ -15,8 +15,10 @@ import com.ocppcentralsystem.model.TagStatus;
 import com.ocppcentralsystem.model.TagType;
 import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import com.ocppcentralsystem.repository.TagRepository;
+import com.ocppcentralsystem.repository.TagSpecifications;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +38,9 @@ public class TagService {
     @Transactional(readOnly = true)
     public List<TagDTO> findAllTags(TagStatus status, TagType tagType, String search) {
         String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
-        return tagMapper.toDtoList(tagRepository.findAllFiltered(status, tagType, normalizedSearch));
+        return tagMapper.toDtoList(tagRepository.findAll(
+                TagSpecifications.matching(status, tagType, normalizedSearch),
+                Sort.by(Sort.Direction.ASC, "customerName")));
     }
 
     @Transactional(readOnly = true)

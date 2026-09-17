@@ -22,6 +22,7 @@ FROM eclipse-temurin:17-jre
 RUN mkdir /config
 COPY src/main/resources/application.yml /config/application.yml
 COPY src/main/resources/application-single-port.yml /config/application-single-port.yml
+COPY src/main/resources/application-postgres.yml /config/application-postgres.yml
 
 # Copy the JAR produced by the build stage
 COPY --from=build /app/target/*.jar /app.jar

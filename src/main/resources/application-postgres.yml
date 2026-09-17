@@ -1,0 +1,38 @@
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+# Activate with:  SPRING_PROFILES_ACTIVE=postgres
+#
+# No credentials live in this file. Supply them from the environment, either by
+# relaxed binding - in which case there is nothing to reference here at all:
+#
+#   SPRING_DATASOURCE_URL=jdbc:postgresql://db-host:5432/ocpp
+#   SPRING_DATASOURCE_USERNAME=ocpp
+#   SPRING_DATASOURCE_PASSWORD=<secret>
+#
+# ...or, if your secrets are named differently, point the placeholders below at
+# them (e.g. ${DB_PASSWORD}).
+#
+# The placeholders deliberately have no fallback value. A missing secret then
+# stops the application at startup ("URL must start with 'jdbc'") instead of
+# silently connecting with a default password - or, worse, falling back to the
+# H2 default from application.yml.
+#
+# Any Spring property can also be overridden from the environment without a
+# placeholder, e.g. SPRING_JPA_HIBERNATE_DDL_AUTO=validate.
+#
+# The JDBC driver and the Hibernate dialect are detected from the URL, so
+# nothing beyond the H2 console has to be switched off here.
+# ──────────────────────────────────────────────────────────────────────────────
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      # Fine while the schema is created from the entities. Once schema changes are
+      # managed by migrations (Flyway/Liquibase), set "validate" so a mismatch
+      # fails at startup rather than being silently altered in production.
+      ddl-auto: update
+  h2:
+    console:
+      enabled: false

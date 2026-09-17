@@ -1,11 +1,12 @@
 spring:
   datasource:
+    # Default setup: an in-memory H2 database, so the app starts with no services.
+    # The JDBC driver and the Hibernate dialect are detected from this URL, so
+    # switching database only means overriding this URL (see application-postgres.yml).
     url: jdbc:h2:mem:testdb
-    driver-class-name: org.h2.Driver
     username: sa
     password:
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: update
   h2:
