@@ -27,6 +27,16 @@ public interface ChargeTransactionRepository extends JpaRepository<ChargeTransac
             @Param("idTag") String idTag
     );
 
+    /**
+     * Resolves the session of the charge point running a transaction without loading the
+     * transaction, so callers do not depend on lazy loading being available.
+     */
+    @Query("""
+    SELECT ct.chargePoint.websocketId FROM ChargeTransaction ct
+    WHERE ct.chargeTransactionId = :transactionId
+    """)
+    Optional<UUID> findChargePointWebsocketId(@Param("transactionId") int transactionId);
+
     List<ChargeTransaction> findByTag_IdTagOrderByLastUpdatedDesc(String idTag);
 
     long countByTag_IdTag(String idTag);
@@ -61,5 +71,4 @@ public interface ChargeTransactionRepository extends JpaRepository<ChargeTransac
                           @Param("powerValue") Integer powerValue,
                           @Param("connectorId") Integer connectorId,
                           @Param("lastUpdated") LocalDateTime lastUpdated);
-
 }

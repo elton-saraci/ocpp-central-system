@@ -1,5 +1,7 @@
 package com.ocppcentralsystem.service;
 
+import com.ocppcentralsystem.exception.DuplicateResourceException;
+import com.ocppcentralsystem.exception.ResourceNotFoundException;
 import com.ocppcentralsystem.mapper.ChargeTransactionMapper;
 import com.ocppcentralsystem.mapper.TagMapper;
 import com.ocppcentralsystem.model.ChargeTransactionDTO;
@@ -15,10 +17,8 @@ import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import com.ocppcentralsystem.repository.TagRepository;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -69,7 +69,7 @@ public class TagService {
     public TagDTO createTag(TagRequest request) {
         String idTag = request.getIdTag().trim();
         if (tagRepository.existsById(idTag)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Tag already exists: " + idTag);
+            throw new DuplicateResourceException("Tag", idTag);
         }
 
         Tag tag = Tag.builder()
@@ -138,6 +138,6 @@ public class TagService {
 
     Tag requireTag(String idTag) {
         return tagRepository.findById(idTag)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tag not found: " + idTag));
+                .orElseThrow(() -> new ResourceNotFoundException("Tag", idTag));
     }
 }

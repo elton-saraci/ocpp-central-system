@@ -1,9 +1,8 @@
 package com.ocppcentralsystem.service;
 
+import com.ocppcentralsystem.exception.ResourceNotFoundException;
 import com.ocppcentralsystem.model.ChargePoint;
 import com.ocppcentralsystem.repository.ChargePointRepository;
-import eu.chargetime.ocpp.JSONServer;
-import eu.chargetime.ocpp.model.Confirmation;
 import eu.chargetime.ocpp.model.core.*;
 import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageConfirmation;
 import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageRequest;
@@ -14,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @AllArgsConstructor
@@ -22,105 +20,63 @@ import java.util.Optional;
 public class ChargePointService {
 
     private final ChargePointRepository chargePointRepository;
-    private final JSONServer jsonServer;
+    private final ChargePointCommunicator chargePointCommunicator;
 
     public List<ChargePoint> getAllChargePoints() {
         return chargePointRepository.findAll();
     }
 
     public boolean sendResetRequestToChargePoint(ResetType resetType, String cpId) {
-        try {
-            log.info("Reset request for cpId -> {}", cpId);
+        log.info("Reset request for cpId -> {}", cpId);
+        ChargePoint chargePoint = requireChargePoint(cpId);
 
-            Optional<ChargePoint> optionalChargePoint = chargePointRepository.findById(cpId);
-            if(optionalChargePoint.isEmpty()) {
-                log.error("No cpId {} found", cpId);
-                return false;
-            }
+        ResetConfirmation confirmation = chargePointCommunicator.send(
+                chargePoint.getWebsocketId(), new ResetRequest(resetType), ResetConfirmation.class);
+        log.info("Reset confirmation for cpId {} -> {}", cpId, confirmation.getStatus());
 
-            ResetRequest resetRequest = new ResetRequest(resetType);
-            Confirmation abstractConfirmation = jsonServer.send(optionalChargePoint.get().getWebsocketId(), resetRequest)
-                    .toCompletableFuture().get();
-            ResetConfirmation resetConfirmation = (ResetConfirmation) abstractConfirmation;
-            log.info("Reset confirmation for cpId {} -> {}", cpId, resetConfirmation.getStatus());
-
-            return resetConfirmation.getStatus().equals(ResetStatus.Accepted);
-        } catch (Exception ex) {
-            log.error("Error occurred while triggering remote request, error message: " + ex.getLocalizedMessage());
-            return false;
-        }
+        return ResetStatus.Accepted.equals(confirmation.getStatus());
     }
 
     public boolean sendConnectorUnlockToChargePoint(String cpId, int connectorId) {
-        try {
-            log.info("ConnectorUnlock request for cpId -> {}, connectorId -> {}", cpId, connectorId);
+        log.info("ConnectorUnlock request for cpId -> {}, connectorId -> {}", cpId, connectorId);
+        ChargePoint chargePoint = requireChargePoint(cpId);
 
-            Optional<ChargePoint> optionalChargePoint = chargePointRepository.findById(cpId);
-            if(optionalChargePoint.isEmpty()) {
-                log.error("No cpId {} found", cpId);
-                return false;
-            }
+        UnlockConnectorConfirmation confirmation = chargePointCommunicator.send(
+                chargePoint.getWebsocketId(), new UnlockConnectorRequest(connectorId), UnlockConnectorConfirmation.class);
+        log.info("ConnectorUnlock request confirmation for cpId {} -> {}", cpId, confirmation.getStatus());
 
-            UnlockConnectorRequest unlockConnectorRequest = new UnlockConnectorRequest(connectorId);
-            Confirmation abstractConfirmation = jsonServer.send(optionalChargePoint.get().getWebsocketId(), unlockConnectorRequest)
-                    .toCompletableFuture().get();
-            UnlockConnectorConfirmation confirmation = (UnlockConnectorConfirmation) abstractConfirmation;
-            log.info("ConnectorUnlock request confirmation for cpId {} -> {}", cpId, confirmation.getStatus());
-
-            return confirmation.getStatus().equals(UnlockStatus.Unlocked);
-        } catch (Exception ex) {
-            log.error("Error occurred while triggering remote request, error message: " + ex.getLocalizedMessage());
-            return false;
-        }
+        return UnlockStatus.Unlocked.equals(confirmation.getStatus());
     }
 
-    public boolean sendTriggerMessageRequestToChargePoint(String cpId, int connectorId, TriggerMessageRequestType triggerMessageRequestType) {
-        try {
-            log.info("TriggerMessageRequest {} for cpId -> {}, connectorId -> {}", triggerMessageRequestType, cpId, connectorId);
+    public boolean sendTriggerMessageRequestToChargePoint(String cpId, int connectorId,
+                                                          TriggerMessageRequestType triggerMessageRequestType) {
+        log.info("TriggerMessageRequest {} for cpId -> {}, connectorId -> {}", triggerMessageRequestType, cpId, connectorId);
+        ChargePoint chargePoint = requireChargePoint(cpId);
 
-            Optional<ChargePoint> optionalChargePoint = chargePointRepository.findById(cpId);
-            if(optionalChargePoint.isEmpty()) {
-                log.error("No cpId {} found", cpId);
-                return false;
-            }
+        TriggerMessageRequest triggerMessageRequest = new TriggerMessageRequest(triggerMessageRequestType);
+        triggerMessageRequest.setConnectorId(connectorId);
 
-            TriggerMessageRequest triggerMessageRequest = new TriggerMessageRequest(triggerMessageRequestType);
-            triggerMessageRequest.setConnectorId(connectorId);
+        TriggerMessageConfirmation confirmation = chargePointCommunicator.send(
+                chargePoint.getWebsocketId(), triggerMessageRequest, TriggerMessageConfirmation.class);
+        log.info("TriggerMessageRequest confirmation for cpId {} -> {}", cpId, confirmation.getStatus());
 
-            Confirmation abstractConfirmation = jsonServer.send(optionalChargePoint.get().getWebsocketId(), triggerMessageRequest)
-                    .toCompletableFuture().get();
-            TriggerMessageConfirmation confirmation = (TriggerMessageConfirmation) abstractConfirmation;
-            log.info("TriggerMessageRequest confirmation for cpId {} -> {}", cpId, confirmation.getStatus());
-
-            return confirmation.getStatus().equals(TriggerMessageStatus.Accepted);
-        } catch (Exception ex) {
-            log.error("Error occurred while triggering remote request, error message: " + ex.getLocalizedMessage());
-            return false;
-        }
+        return TriggerMessageStatus.Accepted.equals(confirmation.getStatus());
     }
 
     public boolean sendChangeConfigurationRequestToChargePoint(String cpId, String key, String value) {
-        try {
-            log.info("ChangeConfigurationRequest for cpId -> {}, key -> {}, value -> {}", cpId, key, value);
+        log.info("ChangeConfigurationRequest for cpId -> {}, key -> {}, value -> {}", cpId, key, value);
+        ChargePoint chargePoint = requireChargePoint(cpId);
 
-            Optional<ChargePoint> optionalChargePoint = chargePointRepository.findById(cpId);
-            if(optionalChargePoint.isEmpty()) {
-                log.error("No cpId {} found", cpId);
-                return false;
-            }
+        ChangeConfigurationConfirmation confirmation = chargePointCommunicator.send(
+                chargePoint.getWebsocketId(), new ChangeConfigurationRequest(key, value), ChangeConfigurationConfirmation.class);
+        log.info("ChangeConfigurationRequest confirmation for cpId {} -> {}", cpId, confirmation.getStatus());
 
-            ChangeConfigurationRequest changeConfigurationRequest = new ChangeConfigurationRequest(key, value);
-
-            Confirmation abstractConfirmation = jsonServer.send(optionalChargePoint.get().getWebsocketId(), changeConfigurationRequest)
-                    .toCompletableFuture().get();
-            ChangeConfigurationConfirmation confirmation = (ChangeConfigurationConfirmation) abstractConfirmation;
-            log.info("TriggerMessageRequest confirmation for cpId {} -> {}", cpId, confirmation.getStatus());
-
-            return confirmation.getStatus().equals(ConfigurationStatus.Accepted);
-        } catch (Exception ex) {
-            log.error("Error occurred while triggering remote request, error message: " + ex.getLocalizedMessage());
-            return false;
-        }
+        return ConfigurationStatus.Accepted.equals(confirmation.getStatus());
     }
 
+    /** @throws ResourceNotFoundException when no charge point is registered with that id. */
+    private ChargePoint requireChargePoint(String cpId) {
+        return chargePointRepository.findById(cpId)
+                .orElseThrow(() -> new ResourceNotFoundException("Charge point", cpId));
+    }
 }
