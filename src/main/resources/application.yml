@@ -26,8 +26,6 @@ logging:
   level:
     io.modelcontextprotocol.server.DefaultMcpStatelessServerHandler: ERROR
 
-tags: tag1, tag2, tag3
-
 # ── Ports (default: two-port mode, router OFF) ─────────────────────────
 # Default setup exposes both ports directly, e.g. local Docker or a VM with
 # the firewall open for 7070 + 8080. The SinglePortRouter bean is disabled

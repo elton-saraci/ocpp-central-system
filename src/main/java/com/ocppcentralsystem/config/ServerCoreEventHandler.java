@@ -4,8 +4,11 @@ import com.ocppcentralsystem.factory.ChargeTransactionFactory;
 import com.ocppcentralsystem.factory.ConfirmationFactory;
 import com.ocppcentralsystem.model.ChargePoint;
 import com.ocppcentralsystem.model.ChargeTransaction;
+import com.ocppcentralsystem.model.Tag;
+import com.ocppcentralsystem.model.TagAuthorization;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.ChargeTransactionRepository;
+import com.ocppcentralsystem.service.TagService;
 import com.ocppcentralsystem.util.MeterValuesUtility;
 import eu.chargetime.ocpp.feature.profile.ServerCoreProfile;
 import eu.chargetime.ocpp.model.core.*;
@@ -19,7 +22,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,7 +32,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ServerCoreEventHandler {
 
-    private final ApplicationConfiguration applicationConfiguration;
+    private final TagService tagService;
     private final ChargeTransactionRepository chargeTransactionRepository;
     private final ChargePointRepository chargePointRepository;
     private static final String TIMEZONE_ID = "UTC";
@@ -44,10 +46,12 @@ public class ServerCoreEventHandler {
             @Override
             public AuthorizeConfirmation handleAuthorizeRequest(UUID sessionIndex, AuthorizeRequest request) {
                 log.info("Incoming authorization request sessionIndex -> {},  authorizeRequest tag -> {}", sessionIndex, request.getIdTag());
-                List<String> whitelistedTags = applicationConfiguration.getWhitelistedIdTags();
-                AuthorizationStatus authorizationStatus = whitelistedTags.contains(request.getIdTag()) ? AuthorizationStatus.Accepted : AuthorizationStatus.Invalid;
-                IdTagInfo idTagInfo = new IdTagInfo(authorizationStatus);
-                return new AuthorizeConfirmation(idTagInfo);
+                Tag tag = tagService.findEntityByIdTag(request.getIdTag()).orElse(null);
+                TagAuthorization authorization = TagAuthorization.of(tag);
+                if (!authorization.isAccepted()) {
+                    log.warn("Rejecting idTag {} for sessionIndex {} -> {}", request.getIdTag(), sessionIndex, authorization);
+                }
+                return new AuthorizeConfirmation(toIdTagInfo(authorization, tag));
             }
 
             @Override
@@ -120,13 +124,21 @@ public class ServerCoreEventHandler {
                     log.info("Updated ChargeTransaction {} with connectorId {} and meterStart {}",
                             chargeTransaction.getChargeTransactionId(), request.getConnectorId(), request.getMeterStart());
                     return new StartTransactionConfirmation(new IdTagInfo(AuthorizationStatus.Accepted), chargeTransaction.getChargeTransactionId());
-                } else {
-                    log.warn("No ChargeTransaction found for websocketId {} and idTag {}, creating new one.", websocketId, request.getIdTag());
-                    ChargePoint chargePoint = chargePointRepository.findByWebsocketId(websocketId).orElseThrow(RuntimeException::new);
-                    ChargeTransaction chargeTransaction = ChargeTransactionFactory.createNewChargingTransactionFromStart(request, chargePoint);
-                    chargeTransactionRepository.save(chargeTransaction);
-                    return new StartTransactionConfirmation(new IdTagInfo(AuthorizationStatus.Accepted), chargeTransaction.getChargeTransactionId());
                 }
+
+                Tag tag = tagService.findEntityByIdTag(request.getIdTag()).orElse(null);
+                TagAuthorization authorization = TagAuthorization.of(tag);
+                if (!authorization.isAccepted()) {
+                    log.warn("Refusing StartTransaction for idTag {} on sessionIndex {} -> {}",
+                            request.getIdTag(), websocketId, authorization);
+                    return new StartTransactionConfirmation(toIdTagInfo(authorization, tag), INVALID_TRANSACTION_ID);
+                }
+
+                ChargePoint chargePoint = chargePointRepository.findByWebsocketId(websocketId).orElseThrow(RuntimeException::new);
+                ChargeTransaction chargeTransaction = ChargeTransactionFactory.createNewChargingTransactionFromStart(request, chargePoint, tag);
+                chargeTransactionRepository.save(chargeTransaction);
+                log.info("Created ChargeTransaction {} for idTag {}", chargeTransaction.getChargeTransactionId(), request.getIdTag());
+                return new StartTransactionConfirmation(new IdTagInfo(AuthorizationStatus.Accepted), chargeTransaction.getChargeTransactionId());
             }
 
             @Override
@@ -170,4 +182,21 @@ public class ServerCoreEventHandler {
         return new ServerCoreProfile(serverCoreEventHandler);
     }
 
+    /** Maps the tag decision onto the OCPP status the charge point understands. */
+    private static AuthorizationStatus toOcppAuthorizationStatus(TagAuthorization authorization) {
+        return switch (authorization) {
+            case ACCEPTED -> AuthorizationStatus.Accepted;
+            case BLOCKED -> AuthorizationStatus.Blocked;
+            case EXPIRED -> AuthorizationStatus.Expired;
+            case UNKNOWN -> AuthorizationStatus.Invalid;
+        };
+    }
+
+    private static IdTagInfo toIdTagInfo(TagAuthorization authorization, Tag tag) {
+        IdTagInfo idTagInfo = new IdTagInfo(toOcppAuthorizationStatus(authorization));
+        if (tag != null && tag.getExpiryDate() != null) {
+            idTagInfo.setExpiryDate(tag.getExpiryDate().atZone(ZoneId.of(TIMEZONE_ID)));
+        }
+        return idTagInfo;
+    }
 }

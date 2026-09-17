@@ -23,8 +23,14 @@ public class ChargeTransaction {
     private Integer meterStop;
     private Integer latestMeterValue;
     private Integer latestPowerValue;
-    @Column(nullable = false)
-    private String idTag;
+
+    /**
+     * The tag that started the session. Fetched eagerly so that DTO mapping and JSON
+     * serialization can read the customer name without an open persistence context.
+     */
+    @ManyToOne(optional = false, fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_tag", referencedColumnName = "idTag", nullable = false)
+    private Tag tag;
 
     @Column(nullable = false)
     private LocalDateTime lastUpdated;
@@ -32,13 +38,17 @@ public class ChargeTransaction {
     @Column(nullable = false)
     private boolean isActive;
 
-    public ChargeTransaction(ChargePoint chargePoint, int connectorId, String idTag) {
+    public ChargeTransaction(ChargePoint chargePoint, int connectorId, Tag tag) {
         this.chargeTransactionId = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
         this.lastUpdated = LocalDateTime.now();
         this.chargePoint = chargePoint;
         this.connectorId = connectorId;
         this.isActive = true;
-        this.idTag = idTag;
+        this.tag = tag;
     }
 
+    /** Convenience accessor for the OCPP identifier of the tag. */
+    public String getIdTag() {
+        return tag != null ? tag.getIdTag() : null;
+    }
 }

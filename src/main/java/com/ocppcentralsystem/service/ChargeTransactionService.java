@@ -1,11 +1,12 @@
 package com.ocppcentralsystem.service;
 
-import com.ocppcentralsystem.config.ApplicationConfiguration;
 import com.ocppcentralsystem.mapper.ChargeTransactionMapper;
 import com.ocppcentralsystem.model.ChargePoint;
 import com.ocppcentralsystem.model.ChargeTransaction;
 import com.ocppcentralsystem.model.ChargeTransactionDTO;
 import com.ocppcentralsystem.model.ChargeTransactionRequest;
+import com.ocppcentralsystem.model.Tag;
+import com.ocppcentralsystem.model.TagAuthorization;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import eu.chargetime.ocpp.JSONServer;
@@ -14,6 +15,7 @@ import eu.chargetime.ocpp.model.core.*;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,8 +30,8 @@ public class ChargeTransactionService {
     private final ChargeTransactionRepository chargeTransactionRepository;
     private final ChargeTransactionMapper mapper;
     private final ChargePointRepository chargePointRepository;
+    private final TagService tagService;
     private final JSONServer jsonServer;
-    private final ApplicationConfiguration applicationConfiguration;
 
     public ChargeTransactionDTO startChargeTransaction(ChargeTransactionRequest chargeTransactionRequest) {
         try {
@@ -41,9 +43,11 @@ public class ChargeTransactionService {
                 throw new RuntimeException("Charge Point does not exist: " + chargeTransactionRequest.getCpId());
             }
 
-            if (!applicationConfiguration.getWhitelistedIdTags().contains(chargeTransactionRequest.getIdTag())) {
-                log.error("Invalid tagId {}, not part of the whitelisted tags {}", chargeTransactionRequest.getIdTag(), applicationConfiguration.getWhitelistedIdTags());
-                throw new RuntimeException("Invalid idTag: " + chargeTransactionRequest.getIdTag());
+            Tag tag = tagService.findEntityByIdTag(chargeTransactionRequest.getIdTag()).orElse(null);
+            TagAuthorization authorization = TagAuthorization.of(tag);
+            if (!authorization.isAccepted()) {
+                log.error("Tag {} cannot be used to start a transaction: {}", chargeTransactionRequest.getIdTag(), authorization);
+                throw new RuntimeException("Tag " + chargeTransactionRequest.getIdTag() + " cannot be used to start a transaction: " + authorization);
             }
 
             RemoteStartTransactionRequest request = new RemoteStartTransactionRequest(chargeTransactionRequest.getIdTag());
@@ -53,7 +57,7 @@ public class ChargeTransactionService {
 
             log.info("The RemoteStartTransactionConfirmation response: {}", remoteStartTransactionConfirmation);
             ChargeTransaction chargeTransaction = saveChargeTransaction(optionalChargePoint.get(), request.getConnectorId(),
-                    request.getIdTag(), remoteStartTransactionConfirmation.getStatus());
+                    tag, remoteStartTransactionConfirmation.getStatus());
             return mapper.toDto(chargeTransaction);
         } catch (Exception ex) {
             log.error("Error occurred, error message: {}", ex.getLocalizedMessage());
@@ -61,8 +65,8 @@ public class ChargeTransactionService {
         }
     }
 
-    private ChargeTransaction saveChargeTransaction(ChargePoint chargePoint, int connectorId, String idTag, RemoteStartStopStatus confirmation) {
-        ChargeTransaction chargeTransaction = new ChargeTransaction(chargePoint, connectorId, idTag);
+    private ChargeTransaction saveChargeTransaction(ChargePoint chargePoint, int connectorId, Tag tag, RemoteStartStopStatus confirmation) {
+        ChargeTransaction chargeTransaction = new ChargeTransaction(chargePoint, connectorId, tag);
         if(confirmation.equals(Rejected)) {
             chargeTransaction.setActive(false);
         }
@@ -90,10 +94,12 @@ public class ChargeTransactionService {
         }
     }
 
+    @Transactional(readOnly = true)
     public ChargeTransactionDTO findChargeTransactionById(int transactionId) {
         return mapper.toDto(chargeTransactionRepository.findById(transactionId).orElse(null));
     }
 
+    @Transactional(readOnly = true)
     public List<ChargeTransactionDTO> findAllChargingTransactions() {
         return mapper.toDtoList(chargeTransactionRepository.findAll());
     }

@@ -32,7 +32,7 @@ public class ChargeTransactionMcpTools {
     public String ocppStartChargeTransaction(
             @ToolParam(description = "The charge point ID, e.g. 'TEST_CP_ID'") String cpId,
             @ToolParam(description = "The connector number on the charge point, e.g. 1") int connectorId,
-            @ToolParam(description = "The RFID authorization tag, e.g. 'tag1'") String idTag
+            @ToolParam(description = "The RFID authorization tag that exists in the tag registry, e.g. 'RFID-0001'") String idTag
     ) {
         return response.from(() -> {
             ChargeTransactionRequest request = new ChargeTransactionRequest(cpId, connectorId, idTag);

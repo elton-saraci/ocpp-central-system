@@ -3,6 +3,7 @@ package com.ocppcentralsystem.factory;
 
 import com.ocppcentralsystem.model.ChargePoint;
 import com.ocppcentralsystem.model.ChargeTransaction;
+import com.ocppcentralsystem.model.Tag;
 import eu.chargetime.ocpp.model.core.StartTransactionRequest;
 
 import java.time.LocalDateTime;
@@ -17,8 +18,7 @@ public class ChargeTransactionFactory {
         return chargeTransaction;
     }
 
-    public static ChargeTransaction createNewChargingTransactionFromStart(StartTransactionRequest startTransactionRequest, ChargePoint chargePoint) {
-        return new ChargeTransaction(chargePoint, startTransactionRequest.getConnectorId(), startTransactionRequest.getIdTag());
+    public static ChargeTransaction createNewChargingTransactionFromStart(StartTransactionRequest startTransactionRequest, ChargePoint chargePoint, Tag tag) {
+        return new ChargeTransaction(chargePoint, startTransactionRequest.getConnectorId(), tag);
     }
-
 }

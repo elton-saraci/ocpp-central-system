@@ -11,6 +11,7 @@ import java.util.List;
 public interface ChargeTransactionMapper {
 
     @Mapping(target = "cpId", expression = "java(chargeTransaction.getChargePoint() != null ? chargeTransaction.getChargePoint().getCpId() : null)")
+    @Mapping(target = "idTag", expression = "java(chargeTransaction.getIdTag())")
     ChargeTransactionDTO toDto(ChargeTransaction chargeTransaction);
 
     List<ChargeTransactionDTO> toDtoList(List<ChargeTransaction> transactions);

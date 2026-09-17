@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,7 +18,7 @@ public interface ChargeTransactionRepository extends JpaRepository<ChargeTransac
     @Query("""
     SELECT ct FROM ChargeTransaction ct
     WHERE ct.chargePoint.websocketId = :websocketId
-      AND ct.idTag = :idTag
+      AND ct.tag.idTag = :idTag
       AND ct.isActive = true
     ORDER BY ct.lastUpdated DESC
     """)
@@ -25,6 +26,10 @@ public interface ChargeTransactionRepository extends JpaRepository<ChargeTransac
             @Param("websocketId") UUID websocketId,
             @Param("idTag") String idTag
     );
+
+    List<ChargeTransaction> findByTag_IdTagOrderByLastUpdatedDesc(String idTag);
+
+    long countByTag_IdTag(String idTag);
 
     @Modifying
     @Transactional
