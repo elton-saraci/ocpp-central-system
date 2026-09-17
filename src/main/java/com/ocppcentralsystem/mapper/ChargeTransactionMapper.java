@@ -15,6 +15,4 @@ public interface ChargeTransactionMapper {
     ChargeTransactionDTO toDto(ChargeTransaction chargeTransaction);
 
     List<ChargeTransactionDTO> toDtoList(List<ChargeTransaction> transactions);
-
-
 }

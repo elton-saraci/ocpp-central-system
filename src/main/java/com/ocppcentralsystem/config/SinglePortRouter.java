@@ -22,7 +22,7 @@ import java.nio.charset.StandardCharsets;
  * Routes every incoming connection on the single public port to either the
  * Spring Boot HTTP server or the OCPP WebSocket server, depending on whether
  * the initial HTTP request is a WebSocket upgrade.
- *
+ * <p>
  * This is required on platforms like Render that only expose a single port
  * ($PORT) to the internet. Charge points connect to the same public port and
  * their OCPP upgrade request is forwarded to the OCPP server on
@@ -35,7 +35,7 @@ import java.nio.charset.StandardCharsets;
  * the plain two-port setup instead.
  */
 @Slf4j
-@ConditionalOnProperty(prefix = "router", name = "enabled", havingValue = "true", matchIfMissing = false)
+@ConditionalOnProperty(prefix = "router", name = "enabled", havingValue = "true")
 @Component
 public class SinglePortRouter implements ApplicationRunner {
 
@@ -92,7 +92,7 @@ public class SinglePortRouter implements ApplicationRunner {
                 int n = clientIn.read(chunk);
                 if (n < 0) break;
                 headBuf.write(chunk, 0, n);
-                String head = new String(headBuf.toByteArray(), StandardCharsets.ISO_8859_1);
+                String head = headBuf.toString(StandardCharsets.ISO_8859_1);
                 if (head.contains("\r\n\r\n")) {
                     websocket = head.toLowerCase().contains("upgrade: websocket");
                     break;

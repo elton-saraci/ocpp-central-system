@@ -24,7 +24,7 @@ public class JsonServerImpl {
                     applicationConfiguration.getWebsocketHost(), applicationConfiguration.getWebsocketPort());
             server.open(applicationConfiguration.getWebsocketHost(), applicationConfiguration.getWebsocketPort(), serverEvents);
         } catch (Exception e) {
-            log.error("Exception while starting the server, error message: " + e.getLocalizedMessage());
+            log.error("Exception while starting the server, error message: {}", e.getLocalizedMessage());
         }
     }
 

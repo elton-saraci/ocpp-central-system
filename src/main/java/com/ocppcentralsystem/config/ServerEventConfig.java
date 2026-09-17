@@ -50,7 +50,7 @@ public class ServerEventConfig {
 					jsonServer.send(websocketId, bootNotification);
 					jsonServer.send(websocketId, statusNotificationRequest);
 				} catch (Exception e) {
-					log.error("Error occurred while handling new session, error message: " + e.getLocalizedMessage());
+                    log.error("Error occurred while handling new session, error message: {}", e.getLocalizedMessage());
 				}
 			}
 

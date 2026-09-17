@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * Base class for errors that are deliberately reported to an API client.
  *
- * <p>Each exception carries the HTTP status to answer with and a stable, machine readable
+ * <p>Each exception carries the HTTP status to answer with and a stable, machine-readable
  * {@code code} (e.g. {@code TAG_NOT_FOUND}) that clients can branch on without parsing messages.</p>
  */
 @Getter
