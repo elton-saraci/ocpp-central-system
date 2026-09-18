@@ -12,10 +12,10 @@ import com.ocppcentralsystem.model.TagDeletionResultDTO;
 import com.ocppcentralsystem.model.TagRequest;
 import com.ocppcentralsystem.model.TagStatus;
 import com.ocppcentralsystem.model.TagType;
-import com.ocppcentralsystem.model.WebsocketConnectionStatus;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import com.ocppcentralsystem.repository.TagRepository;
+import com.ocppcentralsystem.support.ChargePointFixtures;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,9 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -58,8 +56,7 @@ class TagServiceIntegrationTest {
         tagService.createTag(request("RFID-TEST", "Test Customer", TagType.RFID, LocalDateTime.now().plusDays(1)));
         assertEquals(TagAuthorization.ACCEPTED, tagService.authorize("RFID-TEST"));
 
-        ChargePoint chargePoint = chargePointRepository.save(new ChargePoint("CP-TAG-TEST", UUID.randomUUID(),
-                new HashMap<>(), WebsocketConnectionStatus.OPEN, LocalDateTime.now()));
+        ChargePoint chargePoint = chargePointRepository.save(ChargePointFixtures.connectedStation("CP-TAG-TEST"));
 
         Tag tag = tagRepository.findById("RFID-TEST").orElseThrow();
         chargeTransactionRepository.save(new ChargeTransaction(chargePoint, 1, tag));
@@ -68,10 +65,10 @@ class TagServiceIntegrationTest {
 
         List<ChargeTransaction> transactions = chargeTransactionRepository.findByTag_IdTagOrderByLastUpdatedDesc("RFID-TEST");
         assertEquals(1, transactions.size());
-        assertEquals("RFID-TEST", transactions.get(0).getIdTag());
-        assertEquals("Test Customer", transactions.get(0).getTag().getCustomerName());
+        assertEquals("RFID-TEST", transactions.getFirst().getIdTag());
+        assertEquals("Test Customer", transactions.getFirst().getTag().getCustomerName());
 
-        ChargeTransactionDTO dto = chargeTransactionMapper.toDto(transactions.get(0));
+        ChargeTransactionDTO dto = chargeTransactionMapper.toDto(transactions.getFirst());
         assertEquals("RFID-TEST", dto.getIdTag());
         assertEquals("CP-TAG-TEST", dto.getCpId());
 
@@ -163,10 +160,15 @@ class TagServiceIntegrationTest {
 
         assertTrue(tagService.findAllTags(null, null, "nobody").isEmpty());
         assertTrue(tagService.findAllTags(TagStatus.BLOCKED, TagType.APP, null).isEmpty());
-        assertEquals("Alice Anderson", tagService.findAllTags(null, null, null).get(0).getCustomerName());
+        assertEquals("Alice Anderson", tagService.findAllTags(null, null, null).getFirst().getCustomerName());
     }
 
     private TagRequest request(String idTag, String customerName, TagType tagType, LocalDateTime expiryDate) {
-        return new TagRequest(idTag, customerName, null, null, tagType, expiryDate, null);
+        return TagRequest.builder()
+                .idTag(idTag)
+                .customerName(customerName)
+                .tagType(tagType)
+                .expiryDate(expiryDate)
+                .build();
     }
 }

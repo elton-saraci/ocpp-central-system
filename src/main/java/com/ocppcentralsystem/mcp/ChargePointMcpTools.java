@@ -1,6 +1,8 @@
 package com.ocppcentralsystem.mcp;
 
+import com.ocppcentralsystem.service.ChargePointRegistryService;
 import com.ocppcentralsystem.service.ChargePointService;
+import com.ocppcentralsystem.service.SmartChargingService;
 import eu.chargetime.ocpp.model.core.ResetType;
 import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageRequestType;
 import lombok.RequiredArgsConstructor;
@@ -13,11 +15,13 @@ import org.springframework.stereotype.Service;
 public class ChargePointMcpTools {
 
     private final ChargePointService chargePointService;
+    private final ChargePointRegistryService chargePointRegistryService;
+    private final SmartChargingService smartChargingService;
     private final McpToolResponse response;
 
-    @Tool(description = "List all connected or known OCPP charge points.")
+    @Tool(description = "List all registered OCPP charge points, including their connectors and whether they are currently connected.")
     public String ocppListChargePoints() {
-        return response.from(chargePointService::getAllChargePoints);
+        return response.from(() -> chargePointRegistryService.findAllStations(null, null));
     }
 
     @Tool(description = "Send a hard reset request to a charge point. This is a high-risk remote operation and requires explicit user confirmation.")
@@ -88,6 +92,21 @@ public class ChargePointMcpTools {
     ) {
         return response.successFrom(() ->
                 chargePointService.sendChangeConfigurationRequestToChargePoint(cpId, key, value)
+        );
+    }
+
+    /**
+     * Reports the result of the attempt rather than a bare success flag, because the charge point
+     * can refuse the limit - {@code applied} tells the caller whether it took effect.
+     */
+    @Tool(description = "Limit how much power a charge point, or a single connector, may draw, in watts. This is a high-risk remote operation and requires explicit user confirmation.")
+    public String ocppSetChargePointPower(
+            @ToolParam(description = "The charge point ID, e.g. 'TEST_CP_ID'") String cpId,
+            @ToolParam(description = "The power limit in watts, e.g. 11000 for 11 kW") int powerW,
+            @ToolParam(description = "The connector number on the charge point, e.g. 1. Omit to limit the whole charge point.", required = false) Integer connectorId
+    ) {
+        return response.from(() ->
+                smartChargingService.setPowerLimit(cpId, connectorId, powerW, null)
         );
     }
 

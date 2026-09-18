@@ -6,8 +6,8 @@ import com.ocppcentralsystem.model.ChargePoint;
 import com.ocppcentralsystem.model.ChargeTransaction;
 import com.ocppcentralsystem.model.Tag;
 import com.ocppcentralsystem.model.TagAuthorization;
-import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.ChargeTransactionRepository;
+import com.ocppcentralsystem.service.ChargePointRegistryService;
 import com.ocppcentralsystem.service.TagService;
 import com.ocppcentralsystem.util.MeterValuesUtility;
 import eu.chargetime.ocpp.feature.profile.ServerCoreProfile;
@@ -22,7 +22,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,7 +33,7 @@ public class ServerCoreEventHandler {
 
     private final TagService tagService;
     private final ChargeTransactionRepository chargeTransactionRepository;
-    private final ChargePointRepository chargePointRepository;
+    private final ChargePointRegistryService chargePointRegistryService;
     private static final String TIMEZONE_ID = "UTC";
     private static final int DEFAULT_INTERVAL = 60;
     private static final int INVALID_TRANSACTION_ID = 0;
@@ -59,9 +58,10 @@ public class ServerCoreEventHandler {
                 log.info("Boot notification request -> {}, sessionIndex -> {} ", request, sessionIndex);
                 ZonedDateTime zonedDateTime = ZonedDateTime.parse(ZonedDateTime.now(ZoneId.of(TIMEZONE_ID)).format(DateTimeFormatter.ISO_INSTANT));
 
-                // write here the logic that takes care of boot notification requests according to your CP central system requirements.
-
-                return new BootNotificationConfirmation(zonedDateTime, DEFAULT_INTERVAL, RegistrationStatus.Accepted);
+                // A station that is not in the registry, or was disabled, gets Rejected and must not charge.
+                Optional<Integer> heartbeatInterval = chargePointRegistryService.recordBootNotification(sessionIndex, request);
+                return heartbeatInterval.map(integer -> new BootNotificationConfirmation(zonedDateTime, integer, RegistrationStatus.Accepted))
+                        .orElseGet(() -> new BootNotificationConfirmation(zonedDateTime, DEFAULT_INTERVAL, RegistrationStatus.Rejected));
             }
 
             @Override
@@ -76,10 +76,7 @@ public class ServerCoreEventHandler {
             @Override
             public HeartbeatConfirmation handleHeartbeatRequest(UUID sessionIndex, HeartbeatRequest request) {
                 log.info("Heartbeat request -> {}, sessionIndex -> {}", request, sessionIndex);
-                int updated = chargePointRepository.updateLastUpdatedByWebsocketId(sessionIndex, LocalDateTime.now());
-                if (updated == 0) {
-                    log.warn("No ChargePoint found for websocketId: {}", sessionIndex);
-                }
+                chargePointRegistryService.recordHeartbeat(sessionIndex);
                 return new HeartbeatConfirmation(ZonedDateTime.now());
             }
 
@@ -134,7 +131,7 @@ public class ServerCoreEventHandler {
                     return new StartTransactionConfirmation(toIdTagInfo(authorization, tag), INVALID_TRANSACTION_ID);
                 }
 
-                ChargePoint chargePoint = chargePointRepository.findByWebsocketId(websocketId).orElseThrow(RuntimeException::new);
+                ChargePoint chargePoint = chargePointRegistryService.requireStationForSession(websocketId);
                 ChargeTransaction chargeTransaction = ChargeTransactionFactory.createNewChargingTransactionFromStart(request, chargePoint, tag);
                 chargeTransactionRepository.save(chargeTransaction);
                 log.info("Created ChargeTransaction {} for idTag {}", chargeTransaction.getChargeTransactionId(), request.getIdTag());
@@ -145,20 +142,7 @@ public class ServerCoreEventHandler {
             public StatusNotificationConfirmation handleStatusNotificationRequest(UUID sessionIndex,
                                                                                   StatusNotificationRequest request) {
                 log.info("Received StatusNotificationRequest: {}, sessionIndex: {}", request, sessionIndex);
-                return chargePointRepository.findByWebsocketId(sessionIndex)
-                        .map(chargePoint -> updateChargePointStatus(chargePoint, request))
-                        .orElseGet(() -> {
-                            log.warn("No ChargePoint found for websocketId: {}", sessionIndex);
-                            return new StatusNotificationConfirmation();
-                        });
-            }
-
-            private StatusNotificationConfirmation updateChargePointStatus(ChargePoint chargePoint,
-                                                                           StatusNotificationRequest request) {
-                Map<Integer, ChargePointStatus> connectors = chargePoint.getConnectors();
-                connectors.put(request.getConnectorId(), request.getStatus());
-                chargePoint.setLastUpdated(LocalDateTime.now());
-                chargePointRepository.save(chargePoint);
+                chargePointRegistryService.recordConnectorStatus(sessionIndex, request);
                 return new StatusNotificationConfirmation();
             }
 

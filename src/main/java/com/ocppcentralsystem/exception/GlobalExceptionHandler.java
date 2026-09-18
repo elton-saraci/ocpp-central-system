@@ -1,6 +1,7 @@
 package com.ocppcentralsystem.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -48,7 +49,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiErrorResponse> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
         List<String> details = ex.getConstraintViolations().stream()
-                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+                .map(violation -> parameterName(violation) + ": " + violation.getMessage())
                 .toList();
         return respond(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "The request is not valid", details, request);
     }
@@ -100,5 +101,15 @@ public class GlobalExceptionHandler {
                 message,
                 request.getRequestURI(),
                 details));
+    }
+
+    /**
+     * Method validation reports a path such as {@code setPowerLimit.powerW}; only the parameter
+     * name means anything to a client.
+     */
+    private String parameterName(ConstraintViolation<?> violation) {
+        String path = violation.getPropertyPath().toString();
+        int lastDot = path.lastIndexOf('.');
+        return lastDot < 0 ? path : path.substring(lastDot + 1);
     }
 }

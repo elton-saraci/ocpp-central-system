@@ -2,17 +2,16 @@ package com.ocppcentralsystem.service;
 
 import com.ocppcentralsystem.exception.ResourceNotFoundException;
 import com.ocppcentralsystem.exception.TagNotAuthorizedException;
-import com.ocppcentralsystem.model.ChargePoint;
 import com.ocppcentralsystem.model.ChargeTransaction;
 import com.ocppcentralsystem.model.ChargeTransactionDTO;
 import com.ocppcentralsystem.model.ChargeTransactionRequest;
 import com.ocppcentralsystem.model.Tag;
 import com.ocppcentralsystem.model.TagStatus;
 import com.ocppcentralsystem.model.TagType;
-import com.ocppcentralsystem.model.WebsocketConnectionStatus;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import com.ocppcentralsystem.repository.TagRepository;
+import com.ocppcentralsystem.support.ChargePointFixtures;
 import com.ocppcentralsystem.util.MeterValuesUtility;
 import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.feature.profile.ServerCoreEventHandler;
@@ -41,7 +40,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
-import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -208,7 +206,7 @@ class ChargeTransactionIntegrationTest {
     void remoteStartStoresAnActiveTransactionWhenTheChargePointAccepts() throws Exception {
         registerChargePoint();
         tagRepository.save(tag("TX-TAG", TagStatus.ACTIVE, null));
-        answerWith(request -> new RemoteStartTransactionConfirmation(RemoteStartStopStatus.Accepted));
+        answerWith(_ -> new RemoteStartTransactionConfirmation(RemoteStartStopStatus.Accepted));
 
         ChargeTransactionDTO transaction = chargeTransactionService.startChargeTransaction(
                 new ChargeTransactionRequest(CP_ID, 1, "TX-TAG"));
@@ -224,7 +222,7 @@ class ChargeTransactionIntegrationTest {
     void remoteStartIsStoredInactiveWhenTheChargePointRejects() throws Exception {
         registerChargePoint();
         tagRepository.save(tag("TX-TAG", TagStatus.ACTIVE, null));
-        answerWith(request -> new RemoteStartTransactionConfirmation(RemoteStartStopStatus.Rejected));
+        answerWith(_ -> new RemoteStartTransactionConfirmation(RemoteStartStopStatus.Rejected));
 
         ChargeTransactionDTO transaction = chargeTransactionService.startChargeTransaction(
                 new ChargeTransactionRequest(CP_ID, 1, "TX-TAG"));
@@ -264,7 +262,7 @@ class ChargeTransactionIntegrationTest {
         tagRepository.save(tag("TX-TAG", TagStatus.ACTIVE, null));
         int transactionId = start("TX-TAG").getTransactionId();
 
-        answerWith(request -> new RemoteStopTransactionConfirmation(RemoteStartStopStatus.Accepted));
+        answerWith(_ -> new RemoteStopTransactionConfirmation(RemoteStartStopStatus.Accepted));
 
         assertTrue(chargeTransactionService.stopChargeTransaction(transactionId));
     }
@@ -285,8 +283,7 @@ class ChargeTransactionIntegrationTest {
 
     private void registerChargePoint() {
         websocketId = UUID.randomUUID();
-        chargePointRepository.save(new ChargePoint(CP_ID, websocketId, new HashMap<>(),
-                WebsocketConnectionStatus.OPEN, LocalDateTime.now()));
+        chargePointRepository.save(ChargePointFixtures.connectedStation(CP_ID, websocketId));
     }
 
     private StartTransactionConfirmation start(String idTag) {

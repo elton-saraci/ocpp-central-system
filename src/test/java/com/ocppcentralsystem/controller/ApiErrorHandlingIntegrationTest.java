@@ -1,12 +1,11 @@
 package com.ocppcentralsystem.controller;
 
-import com.ocppcentralsystem.model.ChargePoint;
 import com.ocppcentralsystem.model.Tag;
 import com.ocppcentralsystem.model.TagStatus;
 import com.ocppcentralsystem.model.TagType;
-import com.ocppcentralsystem.model.WebsocketConnectionStatus;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.TagRepository;
+import com.ocppcentralsystem.support.ChargePointFixtures;
 import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.model.Request;
 import org.junit.jupiter.api.Test;
@@ -17,8 +16,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -156,7 +153,6 @@ class ApiErrorHandlingIntegrationTest {
     }
 
     private void registerChargePoint() {
-        chargePointRepository.save(new ChargePoint(CP_ID, UUID.randomUUID(), new HashMap<>(),
-                WebsocketConnectionStatus.OPEN, LocalDateTime.now()));
+        chargePointRepository.save(ChargePointFixtures.connectedStation(CP_ID));
     }
 }

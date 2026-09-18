@@ -10,7 +10,9 @@ Built on Java 25, Spring Boot 3.5 and [Java-OCA-OCPP](https://github.com/ChargeT
 ## Features
 
 * OCPP 1.6 over WebSocket: authorize, boot notification, heartbeat, status notification, meter values, start and stop transaction
-* Charge point registry with remote operations (reset, connector unlock, configuration change, trigger messages)
+* Station registry (CRUD) holding identity, connectors, wiring and free-form metadata - only a registered, enabled station is allowed to connect
+* Remote operations on a connected station (reset, connector unlock, configuration change, trigger messages)
+* Smart charging: set, clear and read back the power limit of a charge point or a single connector, in watts
 * Tag registry for authorization (RFID / APP / REMOTE) with customer details, expiry dates and blocking
 * Transaction lifecycle, from remote start through meter values to stop
 * REST API with a consistent error format, documented with OpenAPI / Swagger
@@ -23,7 +25,7 @@ Built on Java 25, Spring Boot 3.5 and [Java-OCA-OCPP](https://github.com/ChargeT
 * Under active development.
 * The API is unauthenticated, so remote operations such as reset and unlock are open to anyone who can reach the port.
 * WebSocket resilience (reconnects, pings, error recovery) still needs work.
-* Test coverage is thin; remote operations are verified against a mocked OCPP transport, so there is no
+* Remote operations are verified against a mocked OCPP transport, so there is no
   end-to-end test with a real charge point yet.
 
 ---
@@ -48,8 +50,9 @@ profile.
 
 API reference: <http://localhost:7070/swagger-ui/index.html> (H2 console: <http://localhost:7070/h2-console>)
 
-Tags live in the database, so register one through the tag API before a charge point can authorize -
-unknown, blocked and expired tags are rejected.
+Stations and tags live in the database: a station must be registered - and enabled - before it may
+connect, and a tag must be registered before a charge point can authorize with it. Unknown, blocked
+and expired tags are rejected.
 
 ---
 

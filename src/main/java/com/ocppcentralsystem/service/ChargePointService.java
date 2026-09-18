@@ -12,8 +12,6 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 @Service
 @AllArgsConstructor
 @Slf4j
@@ -21,10 +19,6 @@ public class ChargePointService {
 
     private final ChargePointRepository chargePointRepository;
     private final ChargePointCommunicator chargePointCommunicator;
-
-    public List<ChargePoint> getAllChargePoints() {
-        return chargePointRepository.findAll();
-    }
 
     public boolean sendResetRequestToChargePoint(ResetType resetType, String cpId) {
         log.info("Reset request for cpId -> {}", cpId);
@@ -74,8 +68,10 @@ public class ChargePointService {
         return ConfigurationStatus.Accepted.equals(confirmation.getStatus());
     }
 
-    /** @throws ResourceNotFoundException when no charge point is registered with that id. */
-    private ChargePoint requireChargePoint(String cpId) {
+    /**
+     * @throws ResourceNotFoundException when no charge point is registered with that id.
+     */
+    ChargePoint requireChargePoint(String cpId) {
         return chargePointRepository.findById(cpId)
                 .orElseThrow(() -> new ResourceNotFoundException("Charge point", cpId));
     }

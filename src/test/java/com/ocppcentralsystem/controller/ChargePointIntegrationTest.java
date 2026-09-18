@@ -4,7 +4,9 @@ import com.ocppcentralsystem.exception.ResourceNotFoundException;
 import com.ocppcentralsystem.model.ChargePoint;
 import com.ocppcentralsystem.model.WebsocketConnectionStatus;
 import com.ocppcentralsystem.repository.ChargePointRepository;
+import com.ocppcentralsystem.service.ChargePointRegistryService;
 import com.ocppcentralsystem.service.ChargePointService;
+import com.ocppcentralsystem.support.ChargePointFixtures;
 import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.feature.profile.ServerCoreEventHandler;
 import eu.chargetime.ocpp.model.Confirmation;
@@ -37,12 +39,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -74,6 +77,8 @@ class ChargePointIntegrationTest {
     @Autowired
     private ChargePointService chargePointService;
     @Autowired
+    private ChargePointRegistryService chargePointRegistryService;
+    @Autowired
     private ChargePointRepository chargePointRepository;
     @Autowired
     private EntityManager entityManager;
@@ -84,27 +89,28 @@ class ChargePointIntegrationTest {
     private JSONServer jsonServer;
 
     @Test
-    void chargePointIsFoundByItsWebsocketIdAndCanBeUpdated() {
+    void aSessionIsTrackedUntilTheStationDisconnects() {
         ChargePoint chargePoint = save();
         UUID websocketId = chargePoint.getWebsocketId();
 
         assertEquals(CP_ID, chargePointRepository.findByWebsocketId(websocketId).orElseThrow().getCpId());
         assertTrue(chargePointRepository.findByWebsocketId(UUID.randomUUID()).isEmpty());
+        assertTrue(chargePoint.isConnected());
 
-        LocalDateTime heartbeatArrived = LocalDateTime.now().plusMinutes(5);
-        assertEquals(1, chargePointRepository.updateLastUpdatedByWebsocketId(websocketId, heartbeatArrived));
-        assertEquals(0, chargePointRepository.updateLastUpdatedByWebsocketId(UUID.randomUUID(), heartbeatArrived));
-
-        chargePointRepository.updateConnectionStatusByWebsocketId(websocketId, WebsocketConnectionStatus.CLOSED);
+        LocalDateTime registeredAt = chargePoint.getLastUpdated();
+        chargePointRegistryService.recordHeartbeat(websocketId);
+        chargePointRegistryService.markSessionClosed(websocketId);
 
         ChargePoint reloaded = reload();
-        assertTrue(reloaded.getLastUpdated().isAfter(chargePoint.getLastUpdated()));
-        assertEquals(WebsocketConnectionStatus.CLOSED, reloaded.getWebsocketConnectionStatus());
+        assertTrue(reloaded.getLastUpdated().isAfter(registeredAt));
+        assertEquals(WebsocketConnectionStatus.CLOSED, reloaded.getConnectionStatus());
+        assertNull(reloaded.getWebsocketId(), "a closed session forgets the handle it was opened with");
+        assertFalse(reloaded.isConnected());
     }
 
     @Test
     void heartbeatAndStatusNotificationUpdateTheChargePoint() {
-        ChargePoint chargePoint = save();
+        ChargePoint chargePoint = chargePointRepository.save(ChargePointFixtures.stationWithConnectors(CP_ID, 1));
         UUID websocketId = chargePoint.getWebsocketId();
         LocalDateTime registeredAt = chargePoint.getLastUpdated();
 
@@ -112,12 +118,17 @@ class ChargePointIntegrationTest {
                 new StatusNotificationRequest(1, ChargePointErrorCode.NoError, ChargePointStatus.Charging));
 
         ChargePoint afterStatusNotification = reload();
-        assertEquals(ChargePointStatus.Charging, afterStatusNotification.getConnectors().get(1));
-        assertTrue(afterStatusNotification.getLastUpdated().isAfter(registeredAt));
+        assertEquals(ChargePointStatus.Charging, afterStatusNotification.getConnectors().getFirst().getStatus());
+        // Read into a LocalDateTime: the reloaded entity stays managed, so a later write would
+        // overwrite the value were it read from the entity again.
+        LocalDateTime statusNotificationAt = afterStatusNotification.getLastUpdated();
+        assertTrue(statusNotificationAt.isAfter(registeredAt));
 
         coreEventHandler.handleHeartbeatRequest(websocketId, new HeartbeatRequest());
 
-        assertTrue(reload().getLastUpdated().isAfter(afterStatusNotification.getLastUpdated()));
+        LocalDateTime afterHeartbeat = reload().getLastUpdated();
+        assertTrue(afterHeartbeat.isAfter(statusNotificationAt),
+                () -> "heartbeat at " + afterHeartbeat + " did not move past " + statusNotificationAt);
     }
 
     @Test
@@ -129,11 +140,18 @@ class ChargePointIntegrationTest {
     }
 
     @Test
-    void bootNotificationIsAccepted() {
-        BootNotificationConfirmation confirmation = coreEventHandler.handleBootNotificationRequest(UUID.randomUUID(),
-                new BootNotificationRequest("Vendor", "Model"));
+    void bootNotificationIsStoredForARegisteredStation() {
+        ChargePoint chargePoint = save();
+
+        BootNotificationConfirmation confirmation = coreEventHandler.handleBootNotificationRequest(
+                chargePoint.getWebsocketId(), new BootNotificationRequest("Vendor", "Model"));
 
         assertEquals(RegistrationStatus.Accepted, confirmation.getStatus());
+        assertEquals(60, confirmation.getInterval(), "without a configured interval a station heartbeats every minute");
+
+        ChargePoint reloaded = reload();
+        assertEquals("Vendor", reloaded.getVendor());
+        assertEquals("Model", reloaded.getModel());
     }
 
     @Test
@@ -234,8 +252,7 @@ class ChargePointIntegrationTest {
     }
 
     private ChargePoint save(String cpId) {
-        return chargePointRepository.save(new ChargePoint(cpId, UUID.randomUUID(), new HashMap<>(),
-                WebsocketConnectionStatus.OPEN, LocalDateTime.now()));
+        return chargePointRepository.save(ChargePointFixtures.connectedStation(cpId));
     }
 
     private ChargePoint reload() {

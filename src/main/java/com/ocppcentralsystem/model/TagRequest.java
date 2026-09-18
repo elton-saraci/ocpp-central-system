@@ -4,8 +4,11 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -14,9 +17,14 @@ import java.time.LocalDateTime;
  *
  * <p>When updating an existing tag the {@code idTag} in the path wins; the value in the
  * body is only used on creation.</p>
+ *
+ * <p>Build one in code; JSON is bound through the no-arg constructor and the setters, so the
+ * all-args constructor stays package-private to keep seven-argument calls out of the codebase.</p>
  */
 @Data
-@AllArgsConstructor
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PACKAGE)
 public class TagRequest {
 
     @NotBlank(message = "idTag is required")

@@ -41,6 +41,8 @@ public interface ChargeTransactionRepository extends JpaRepository<ChargeTransac
 
     long countByTag_IdTag(String idTag);
 
+    long countByChargePoint_CpId(String cpId);
+
     @Modifying
     @Transactional
     @Query("""
