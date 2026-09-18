@@ -2,7 +2,7 @@
 # Compiles the application into a JAR inside Docker, so no pre-built
 # target/ artifact is required (needed for Render and fresh clones,
 # since target/ is gitignored).
-FROM maven:3.9-eclipse-temurin-17 AS build
+FROM maven:3.9-eclipse-temurin-25 AS build
 WORKDIR /app
 
 # Copy the pom.xml first to leverage Docker layer caching for dependencies
@@ -16,7 +16,7 @@ COPY src ./src
 RUN mvn -B -DskipTests package
 
 # ---- Runtime stage ----
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:25-jre
 
 # Create config directory and copy the application.yml files into it
 RUN mkdir /config

@@ -3,7 +3,7 @@
 Spring Boot backend that acts as an OCPP 1.6 central system: it talks to EV charge points over
 WebSocket and exposes a REST API to monitor and control them.
 
-Built on Java 17, Spring Boot 3.4 and [Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP).
+Built on Java 25, Spring Boot 3.5 and [Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP).
 
 ---
 
@@ -30,7 +30,7 @@ Built on Java 17, Spring Boot 3.4 and [Java-OCA-OCPP](https://github.com/ChargeT
 
 ## Run
 
-Requires Java 17 (newer JDKs break the Lombok/MapStruct annotation processors) and Maven 3.
+Requires Java 25 and Maven 3.9+.
 
 ```bash
 mvn spring-boot:run
