@@ -55,17 +55,17 @@ public class ChargePointRegistryService {
     private final ChargePointMapper mapper;
 
     @Transactional(readOnly = true)
-    public List<ChargePointDTO> findAllStations(String cpId, Boolean enabled) {
+    public List<ChargePointDTO> findAllStations(String tenant, String cpId, Boolean enabled) {
         return mapper.toDtoList(chargePointRepository.findAll(
-                ChargePointSpecifications.matching(cpId, enabled), Sort.by("cpId")));
+                ChargePointSpecifications.matching(tenant, cpId, enabled), Sort.by("cpId")));
     }
 
     /**
-     * @throws ResourceNotFoundException when the station is not registered.
+     * @throws ResourceNotFoundException when the station is not registered in that tenant.
      */
     @Transactional(readOnly = true)
-    public ChargePoint requireStation(String cpId) {
-        return chargePointRepository.findById(cpId)
+    public ChargePoint requireStation(String tenant, String cpId) {
+        return chargePointRepository.findByTenantAndCpId(tenant, cpId)
                 .orElseThrow(() -> new ResourceNotFoundException("Charge point", cpId));
     }
 
@@ -79,15 +79,29 @@ public class ChargePointRegistryService {
         return chargePointRepository.findByWebsocketId(websocketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Charge point", websocketId));
     }
-
+    /**
+     * @return the tenant of the station holding this session, or empty when no registered station
+     *         does. OCPP messages carry no tenant of their own, so the station row decides which
+     *         tenant a session acts for.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> findSessionTenant(UUID websocketId) {
+        return chargePointRepository.findByWebsocketId(websocketId)
+                .map(ChargePoint::getTenant);
+    }
     @Transactional
-    public ChargePointDTO createStation(ChargePointRequest request) {
+    public ChargePointDTO createStation(String tenant, ChargePointRequest request) {
         String cpId = request.getCpId().trim();
-        if (chargePointRepository.existsById(cpId)) {
+        if (chargePointRepository.existsByTenantAndCpId(tenant, cpId)) {
             throw new DuplicateResourceException("Charge point", cpId);
+        }
+        if (chargePointRepository.existsById(cpId)) {
+            throw new DuplicateResourceException("Charge point", cpId,
+                    "the cpId is already used by another tenant");
         }
 
         ChargePoint station = ChargePoint.builder()
+                .tenant(tenant)
                 .cpId(cpId)
                 .enabled(request.getEnabled() == null || request.getEnabled())
                 .connectors(new ArrayList<>())
@@ -95,7 +109,8 @@ public class ChargePointRegistryService {
         applyDetails(request, station);
 
         ChargePoint saved = chargePointRepository.saveAndFlush(station);
-        log.info("Registered station {} with {} connector(s)", saved.getCpId(), saved.getConnectors().size());
+        log.info("Registered station {} in tenant {} with {} connector(s)",
+                saved.getCpId(), tenant, saved.getConnectors().size());
         return mapper.toDto(saved);
     }
 
@@ -104,8 +119,8 @@ public class ChargePointRegistryService {
      * so changing it would orphan the station rather than rename it.
      */
     @Transactional
-    public ChargePointDTO updateStation(String cpId, ChargePointRequest request) {
-        ChargePoint station = requireStation(cpId);
+    public ChargePointDTO updateStation(String tenant, String cpId, ChargePointRequest request) {
+        ChargePoint station = requireStation(tenant, cpId);
         applyDetails(request, station);
         if (request.getEnabled() != null) {
             station.setEnabled(request.getEnabled());
@@ -117,8 +132,8 @@ public class ChargePointRegistryService {
     }
 
     @Transactional
-    public ChargePointDTO setStationEnabled(String cpId, boolean enabled) {
-        ChargePoint station = requireStation(cpId);
+    public ChargePointDTO setStationEnabled(String tenant, String cpId, boolean enabled) {
+        ChargePoint station = requireStation(tenant, cpId);
         station.setEnabled(enabled);
 
         ChargePoint saved = chargePointRepository.saveAndFlush(station);
@@ -131,9 +146,9 @@ public class ChargePointRegistryService {
      * keep a station to point at.
      */
     @Transactional
-    public ChargePointDeletionResultDTO deleteStation(String cpId) {
-        ChargePoint station = requireStation(cpId);
-        long transactionCount = chargeTransactionRepository.countByChargePoint_CpId(cpId);
+    public ChargePointDeletionResultDTO deleteStation(String tenant, String cpId) {
+        ChargePoint station = requireStation(tenant, cpId);
+        long transactionCount = chargeTransactionRepository.countByTenantAndChargePoint_CpId(tenant, cpId);
 
         if (transactionCount > 0) {
             station.setEnabled(false);

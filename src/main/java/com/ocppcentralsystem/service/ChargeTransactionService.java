@@ -32,11 +32,11 @@ public class ChargeTransactionService {
     private final TagService tagService;
     private final ChargePointCommunicator chargePointCommunicator;
 
-    public ChargeTransactionDTO startChargeTransaction(ChargeTransactionRequest chargeTransactionRequest) {
-        ChargePoint chargePoint = chargePointRepository.findById(chargeTransactionRequest.getCpId())
+    public ChargeTransactionDTO startChargeTransaction(String tenant, ChargeTransactionRequest chargeTransactionRequest) {
+        ChargePoint chargePoint = chargePointRepository.findByTenantAndCpId(tenant, chargeTransactionRequest.getCpId())
                 .orElseThrow(() -> new ResourceNotFoundException("Charge point", chargeTransactionRequest.getCpId()));
 
-        Tag tag = tagService.findEntityByIdTag(chargeTransactionRequest.getIdTag())
+        Tag tag = tagService.findEntityByIdTag(tenant, chargeTransactionRequest.getIdTag())
                 .orElseThrow(() -> new ResourceNotFoundException("Tag", chargeTransactionRequest.getIdTag()));
         if (!tag.isUsable()) {
             throw new TagNotAuthorizedException(tag);
@@ -66,7 +66,12 @@ public class ChargeTransactionService {
      * @return {@code true} when the charge point accepted the stop. A charge point that answers
      *         {@code Rejected} is not an error - the caller asked, the charge point said no.
      */
-    public boolean stopChargeTransaction(int chargeTransactionId) {
+    public boolean stopChargeTransaction(String tenant, int chargeTransactionId) {
+        // Scoped to the tenant first, so a transaction of another tenant cannot be stopped by
+        // guessing its id.
+        chargeTransactionRepository.findByTenantAndChargeTransactionId(tenant, chargeTransactionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Charge transaction", chargeTransactionId));
+
         UUID websocketId = chargeTransactionRepository.findChargePointWebsocketId(chargeTransactionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Charge transaction", chargeTransactionId));
 
@@ -78,14 +83,14 @@ public class ChargeTransactionService {
     }
 
     @Transactional(readOnly = true)
-    public ChargeTransactionDTO findChargeTransactionById(int transactionId) {
-        return chargeTransactionRepository.findById(transactionId)
+    public ChargeTransactionDTO findChargeTransactionById(String tenant, int transactionId) {
+        return chargeTransactionRepository.findByTenantAndChargeTransactionId(tenant, transactionId)
                 .map(mapper::toDto)
                 .orElseThrow(() -> new ResourceNotFoundException("Charge transaction", transactionId));
     }
 
     @Transactional(readOnly = true)
-    public List<ChargeTransactionDTO> findAllChargingTransactions() {
-        return mapper.toDtoList(chargeTransactionRepository.findAll());
+    public List<ChargeTransactionDTO> findAllChargingTransactions(String tenant) {
+        return mapper.toDtoList(chargeTransactionRepository.findByTenant(tenant));
     }
 }

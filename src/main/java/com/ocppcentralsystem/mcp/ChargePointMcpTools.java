@@ -3,6 +3,7 @@ package com.ocppcentralsystem.mcp;
 import com.ocppcentralsystem.service.ChargePointRegistryService;
 import com.ocppcentralsystem.service.ChargePointService;
 import com.ocppcentralsystem.service.SmartChargingService;
+import com.ocppcentralsystem.tenant.TenantResolver;
 import eu.chargetime.ocpp.model.core.ResetType;
 import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageRequestType;
 import lombok.RequiredArgsConstructor;
@@ -17,11 +18,12 @@ public class ChargePointMcpTools {
     private final ChargePointService chargePointService;
     private final ChargePointRegistryService chargePointRegistryService;
     private final SmartChargingService smartChargingService;
+    private final TenantResolver tenantResolver;
     private final McpToolResponse response;
 
     @Tool(description = "List all registered OCPP charge points, including their connectors and whether they are currently connected.")
     public String ocppListChargePoints() {
-        return response.from(() -> chargePointRegistryService.findAllStations(null, null));
+        return response.from(() -> chargePointRegistryService.findAllStations(tenantResolver.current(), null, null));
     }
 
     @Tool(description = "Send a hard reset request to a charge point. This is a high-risk remote operation and requires explicit user confirmation.")
@@ -29,7 +31,7 @@ public class ChargePointMcpTools {
             @ToolParam(description = "The charge point ID, e.g. 'TEST_CP_ID'") String cpId
     ) {
         return response.successFrom(() ->
-                chargePointService.sendResetRequestToChargePoint(ResetType.Hard, cpId)
+                chargePointService.sendResetRequestToChargePoint(tenantResolver.current(), ResetType.Hard, cpId)
         );
     }
 
@@ -38,7 +40,7 @@ public class ChargePointMcpTools {
             @ToolParam(description = "The charge point ID, e.g. 'TEST_CP_ID'") String cpId
     ) {
         return response.successFrom(() ->
-                chargePointService.sendResetRequestToChargePoint(ResetType.Soft, cpId)
+                chargePointService.sendResetRequestToChargePoint(tenantResolver.current(), ResetType.Soft, cpId)
         );
     }
 
@@ -48,7 +50,7 @@ public class ChargePointMcpTools {
             @ToolParam(description = "The connector number on the charge point, e.g. 1") int connectorId
     ) {
         return response.successFrom(() ->
-                chargePointService.sendConnectorUnlockToChargePoint(cpId, connectorId)
+                chargePointService.sendConnectorUnlockToChargePoint(tenantResolver.current(), cpId, connectorId)
         );
     }
 
@@ -91,7 +93,8 @@ public class ChargePointMcpTools {
             @ToolParam(description = "The new value for the OCPP configuration key") String value
     ) {
         return response.successFrom(() ->
-                chargePointService.sendChangeConfigurationRequestToChargePoint(cpId, key, value)
+                chargePointService.sendChangeConfigurationRequestToChargePoint(
+                        tenantResolver.current(), cpId, key, value)
         );
     }
 
@@ -106,7 +109,7 @@ public class ChargePointMcpTools {
             @ToolParam(description = "The connector number on the charge point, e.g. 1. Omit to limit the whole charge point.", required = false) Integer connectorId
     ) {
         return response.from(() ->
-                smartChargingService.setPowerLimit(cpId, connectorId, powerW, null)
+                smartChargingService.setPowerLimit(tenantResolver.current(), cpId, connectorId, powerW, null)
         );
     }
 
@@ -117,6 +120,7 @@ public class ChargePointMcpTools {
     ) {
         return response.successFrom(() ->
                 chargePointService.sendTriggerMessageRequestToChargePoint(
+                        tenantResolver.current(),
                         cpId,
                         connectorId,
                         requestType

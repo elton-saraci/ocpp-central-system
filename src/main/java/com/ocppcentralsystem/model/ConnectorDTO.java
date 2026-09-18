@@ -15,8 +15,6 @@ public class ConnectorDTO {
     private ConnectorType type;
     private ConnectorFormat format;
     private PowerType powerType;
-    /** Phases the server derives from the power type, used to convert watts to amperes. */
-    private Integer phases;
     private Integer maxVoltage;
     private Integer maxAmperage;
     private Integer maxElectricPower;

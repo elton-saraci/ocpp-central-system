@@ -2,6 +2,7 @@ package com.ocppcentralsystem.mcp;
 
 import com.ocppcentralsystem.model.ChargeTransactionRequest;
 import com.ocppcentralsystem.service.ChargeTransactionService;
+import com.ocppcentralsystem.tenant.TenantResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -12,11 +13,12 @@ import org.springframework.stereotype.Service;
 public class ChargeTransactionMcpTools {
 
     private final ChargeTransactionService chargeTransactionService;
+    private final TenantResolver tenantResolver;
     private final McpToolResponse response;
 
     @Tool(description = "List all charging transactions known by the central system.")
     public String ocppListChargeTransactions() {
-        return response.from(chargeTransactionService::findAllChargingTransactions);
+        return response.from(() -> chargeTransactionService.findAllChargingTransactions(tenantResolver.current()));
     }
 
     @Tool(description = "Get a charging transaction by its transaction ID.")
@@ -24,7 +26,7 @@ public class ChargeTransactionMcpTools {
             @ToolParam(description = "The transaction ID") int transactionId
     ) {
         return response.from(() ->
-                chargeTransactionService.findChargeTransactionById(transactionId)
+                chargeTransactionService.findChargeTransactionById(tenantResolver.current(), transactionId)
         );
     }
 
@@ -36,7 +38,7 @@ public class ChargeTransactionMcpTools {
     ) {
         return response.from(() -> {
             ChargeTransactionRequest request = new ChargeTransactionRequest(cpId, connectorId, idTag);
-            return chargeTransactionService.startChargeTransaction(request);
+            return chargeTransactionService.startChargeTransaction(tenantResolver.current(), request);
         });
     }
 
@@ -45,7 +47,7 @@ public class ChargeTransactionMcpTools {
             @ToolParam(description = "The transaction ID to stop") int transactionId
     ) {
         return response.successFrom(() ->
-                chargeTransactionService.stopChargeTransaction(transactionId)
+                chargeTransactionService.stopChargeTransaction(tenantResolver.current(), transactionId)
         );
     }
 }

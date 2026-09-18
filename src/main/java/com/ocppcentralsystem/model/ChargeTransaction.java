@@ -15,6 +15,13 @@ public class ChargeTransaction {
     @Id
     @Column(nullable = false)
     private int chargeTransactionId;
+
+    /**
+     * The tenant of the station that runs the transaction, taken from it on construction. Stored
+     * here as well so transactions can be listed per tenant without joining the station.
+     */
+    @Column(nullable = false, length = 50)
+    private String tenant;
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "cp_id", referencedColumnName = "cpId", nullable = false)
     private ChargePoint chargePoint;
@@ -42,6 +49,8 @@ public class ChargeTransaction {
         this.chargeTransactionId = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
         this.lastUpdated = LocalDateTime.now();
         this.chargePoint = chargePoint;
+        // Always the station's tenant: a transaction cannot belong somewhere its station does not.
+        this.tenant = chargePoint.getTenant();
         this.connectorId = connectorId;
         this.isActive = true;
         this.tag = tag;

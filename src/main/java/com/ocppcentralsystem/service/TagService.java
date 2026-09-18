@@ -36,47 +36,56 @@ public class TagService {
     private final ChargeTransactionMapper chargeTransactionMapper;
 
     @Transactional(readOnly = true)
-    public List<TagDTO> findAllTags(TagStatus status, TagType tagType, String search) {
+    public List<TagDTO> findAllTags(String tenant, TagStatus status, TagType tagType, String search) {
         String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
         return tagMapper.toDtoList(tagRepository.findAll(
-                TagSpecifications.matching(status, tagType, normalizedSearch),
+                TagSpecifications.matching(tenant, status, tagType, normalizedSearch),
                 Sort.by(Sort.Direction.ASC, "customerName")));
     }
 
     @Transactional(readOnly = true)
-    public TagDTO findTagByIdTag(String idTag) {
-        return tagMapper.toDto(requireTag(idTag));
+    public TagDTO findTagByIdTag(String tenant, String idTag) {
+        return tagMapper.toDto(requireTag(tenant, idTag));
     }
 
     @Transactional(readOnly = true)
-    public List<ChargeTransactionDTO> findTransactionsByTag(String idTag) {
-        requireTag(idTag);
+    public List<ChargeTransactionDTO> findTransactionsByTag(String tenant, String idTag) {
+        requireTag(tenant, idTag);
         return chargeTransactionMapper.toDtoList(
-                chargeTransactionRepository.findByTag_IdTagOrderByLastUpdatedDesc(idTag));
+                chargeTransactionRepository.findByTenantAndTag_IdTagOrderByLastUpdatedDesc(tenant, idTag));
     }
 
     /** @return the tag, or empty when it is not registered. Never throws. */
     @Transactional(readOnly = true)
-    public Optional<Tag> findEntityByIdTag(String idTag) {
+    public Optional<Tag> findEntityByIdTag(String tenant, String idTag) {
         if (idTag == null || idTag.isBlank()) {
             return Optional.empty();
         }
-        return tagRepository.findById(idTag.trim());
+        return tagRepository.findByTenantAndIdTag(tenant, idTag.trim());
     }
 
-    /** Authorization decision for an incoming OCPP idTag. */
-    public TagAuthorization authorize(String idTag) {
-        return TagAuthorization.of(findEntityByIdTag(idTag).orElse(null));
+    /**
+     * Authorization decision for an incoming OCPP idTag.
+     *
+     * @param tenant the tenant of the station that asked, so a tag registered by one tenant can
+     *               never authorize a station of another.
+     */
+    public TagAuthorization authorize(String tenant, String idTag) {
+        return TagAuthorization.of(findEntityByIdTag(tenant, idTag).orElse(null));
     }
 
     @Transactional
-    public TagDTO createTag(TagRequest request) {
+    public TagDTO createTag(String tenant, TagRequest request) {
         String idTag = request.getIdTag().trim();
-        if (tagRepository.existsById(idTag)) {
+        if (tagRepository.existsByTenantAndIdTag(tenant, idTag)) {
             throw new DuplicateResourceException("Tag", idTag);
+        }
+        if (tagRepository.existsById(idTag)) {
+            throw new DuplicateResourceException("Tag", idTag, "the idTag is already used by another tenant");
         }
 
         Tag tag = Tag.builder()
+                .tenant(tenant)
                 .idTag(idTag)
                 .customerName(request.getCustomerName().trim())
                 .email(request.getEmail())
@@ -88,13 +97,13 @@ public class TagService {
                 .build();
 
         Tag saved = tagRepository.saveAndFlush(tag);
-        log.info("Created tag {} for customer {}", saved.getIdTag(), saved.getCustomerName());
+        log.info("Created tag {} for customer {} in tenant {}", saved.getIdTag(), saved.getCustomerName(), tenant);
         return tagMapper.toDto(saved);
     }
 
     @Transactional
-    public TagDTO updateTag(String idTag, TagRequest request) {
-        Tag tag = requireTag(idTag);
+    public TagDTO updateTag(String tenant, String idTag, TagRequest request) {
+        Tag tag = requireTag(tenant, idTag);
 
         tag.setCustomerName(request.getCustomerName().trim());
         tag.setEmail(request.getEmail());
@@ -110,8 +119,8 @@ public class TagService {
 
     /** Activates or blocks a tag without touching its other fields. */
     @Transactional
-    public TagDTO updateTagStatus(String idTag, TagStatus status) {
-        Tag tag = requireTag(idTag);
+    public TagDTO updateTagStatus(String tenant, String idTag, TagStatus status) {
+        Tag tag = requireTag(tenant, idTag);
         tag.setStatus(status);
 
         Tag saved = tagRepository.saveAndFlush(tag);
@@ -124,9 +133,9 @@ public class TagService {
      * that historic transactions keep pointing at a real customer record.
      */
     @Transactional
-    public TagDeletionResultDTO deleteTag(String idTag) {
-        Tag tag = requireTag(idTag);
-        long transactionCount = chargeTransactionRepository.countByTag_IdTag(idTag);
+    public TagDeletionResultDTO deleteTag(String tenant, String idTag) {
+        Tag tag = requireTag(tenant, idTag);
+        long transactionCount = chargeTransactionRepository.countByTenantAndTag_IdTag(tenant, idTag);
 
         if (transactionCount > 0) {
             tag.setStatus(TagStatus.BLOCKED);
@@ -140,8 +149,8 @@ public class TagService {
         return new TagDeletionResultDTO(idTag, TagDeletionAction.DELETED, 0, null);
     }
 
-    Tag requireTag(String idTag) {
-        return tagRepository.findById(idTag)
+    Tag requireTag(String tenant, String idTag) {
+        return tagRepository.findByTenantAndIdTag(tenant, idTag)
                 .orElseThrow(() -> new ResourceNotFoundException("Tag", idTag));
     }
 }

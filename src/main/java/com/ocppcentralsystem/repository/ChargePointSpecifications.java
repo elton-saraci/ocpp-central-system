@@ -18,9 +18,14 @@ public final class ChargePointSpecifications {
     private ChargePointSpecifications() {
     }
 
-    public static Specification<ChargePoint> matching(String cpId, Boolean enabled) {
+    /**
+     * @param tenant the tenant whose stations to list, always applied - it is never a filter a
+     *               caller can leave out.
+     */
+    public static Specification<ChargePoint> matching(String tenant, String cpId, Boolean enabled) {
         return (root, _, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
+            predicates.add(criteriaBuilder.equal(root.get("tenant"), tenant));
 
             if (cpId != null) {
                 predicates.add(criteriaBuilder.equal(root.get("cpId"), cpId));
@@ -29,9 +34,6 @@ public final class ChargePointSpecifications {
                 predicates.add(criteriaBuilder.equal(root.get("enabled"), enabled));
             }
 
-            if (predicates.isEmpty()) {
-                return criteriaBuilder.conjunction();
-            }
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
     }

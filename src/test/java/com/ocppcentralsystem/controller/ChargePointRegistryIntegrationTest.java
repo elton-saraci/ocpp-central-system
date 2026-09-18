@@ -11,6 +11,7 @@ import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import com.ocppcentralsystem.repository.TagRepository;
 import com.ocppcentralsystem.service.ChargePointRegistryService;
 import com.ocppcentralsystem.service.TagService;
+import com.ocppcentralsystem.support.TestTenants;
 import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.feature.profile.ServerCoreEventHandler;
 import eu.chargetime.ocpp.model.core.BootNotificationConfirmation;
@@ -54,6 +55,7 @@ class ChargePointRegistryIntegrationTest {
 
     private static final String CP_ID = "CP-REG-1";
     private static final String TAG_ID = "REG-TAG";
+    private static final String TENANT = TestTenants.DEFAULT;
 
     @Autowired
     private MockMvc mockMvc;
@@ -103,7 +105,7 @@ class ChargePointRegistryIntegrationTest {
                 .andExpect(jsonPath("$.connectors.length()").value(1))
                 .andExpect(jsonPath("$.connectors[0].connectorId").value(1))
                 .andExpect(jsonPath("$.connectors[0].maxAmperage").value(32))
-                .andExpect(jsonPath("$.connectors[0].phases").value(3));
+                .andExpect(jsonPath("$.connectors[0].powerType").value("AC_3_PHASE"));
     }
 
     @Test
@@ -119,7 +121,7 @@ class ChargePointRegistryIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
 
-        registry.setStationEnabled(CP_ID, false);
+        registry.setStationEnabled(TENANT, CP_ID, false);
 
         mockMvc.perform(get("/charge-point").param("enabled", "false"))
                 .andExpect(status().isOk())
@@ -231,7 +233,7 @@ class ChargePointRegistryIntegrationTest {
                 "a station that is not in the registry is refused");
         assertTrue(registry.registerSession(CP_ID, UUID.randomUUID()));
 
-        registry.setStationEnabled(CP_ID, false);
+        registry.setStationEnabled(TENANT, CP_ID, false);
         assertFalse(registry.registerSession(CP_ID, UUID.randomUUID()),
                 "a disabled station is refused even though it is registered");
     }
@@ -247,7 +249,7 @@ class ChargePointRegistryIntegrationTest {
         registerStation();
         UUID session = UUID.randomUUID();
         assertTrue(registry.registerSession(CP_ID, session));
-        registry.setStationEnabled(CP_ID, false);
+        registry.setStationEnabled(TENANT, CP_ID, false);
 
         BootNotificationConfirmation disabledStation = coreEventHandler.handleBootNotificationRequest(session, request);
         assertEquals(RegistrationStatus.Rejected, disabledStation.getStatus());
@@ -304,7 +306,7 @@ class ChargePointRegistryIntegrationTest {
     }
 
     private void storeATransactionOn() {
-        tagService.createTag(TagRequest.builder()
+        tagService.createTag(TENANT, TagRequest.builder()
                 .idTag(TAG_ID)
                 .customerName("Transaction owner")
                 .tagType(TagType.RFID)

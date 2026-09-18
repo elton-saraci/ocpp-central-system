@@ -23,9 +23,15 @@ public final class TagSpecifications {
     private TagSpecifications() {
     }
 
-    public static Specification<Tag> matching(TagStatus status, TagType tagType, String search) {
-        return (root, query, criteriaBuilder) -> {
+    /**
+     * @param tenant the tenant whose tags to list, always applied - it is never a filter a caller
+     *               can leave out.
+     */
+    public static Specification<Tag> matching(String tenant, TagStatus status, TagType tagType, String search) {
+        // The second parameter - the query itself - is unnamed: nothing here orders or de-duplicates.
+        return (root, _, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
+            predicates.add(criteriaBuilder.equal(root.get("tenant"), tenant));
 
             if (status != null) {
                 predicates.add(criteriaBuilder.equal(root.get("status"), status));
@@ -40,9 +46,6 @@ public final class TagSpecifications {
                         criteriaBuilder.like(criteriaBuilder.lower(root.get("customerName")), pattern)));
             }
 
-            if (predicates.isEmpty()) {
-                return criteriaBuilder.conjunction();
-            }
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
     }

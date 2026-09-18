@@ -5,6 +5,7 @@ import com.ocppcentralsystem.model.ChargePointDeletionResultDTO;
 import com.ocppcentralsystem.model.ChargePointRequest;
 import com.ocppcentralsystem.service.ChargePointRegistryService;
 import com.ocppcentralsystem.service.ChargePointService;
+import com.ocppcentralsystem.tenant.TenantId;
 import eu.chargetime.ocpp.model.core.ResetType;
 import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageRequestType;
 import jakarta.validation.Valid;
@@ -26,6 +27,9 @@ import java.util.List;
  * collection with {@code ?cpId=}.</p>
  *
  * <p>Power limits live in {@link SmartChargingController}.</p>
+ *
+ * <p>Everything here is scoped to the tenant of the request, taken from the
+ * {@link com.ocppcentralsystem.tenant.TenantResolver#TENANT_HEADER} header.</p>
  */
 @Slf4j
 @RestController
@@ -39,33 +43,38 @@ public class ChargePointController {
     /** Lists registered stations, optionally filtered by id or by whether they are enabled. */
     @GetMapping
     public ResponseEntity<List<ChargePointDTO>> findChargePoints(
+            @TenantId String tenant,
             @RequestParam(required = false) String cpId,
             @RequestParam(required = false) Boolean enabled) {
-        log.info("Listing stations, cpId -> {}, enabled -> {}", cpId, enabled);
-        return ResponseEntity.ok(chargePointRegistryService.findAllStations(cpId, enabled));
+        log.info("Listing stations of tenant {}, cpId -> {}, enabled -> {}", tenant, cpId, enabled);
+        return ResponseEntity.ok(chargePointRegistryService.findAllStations(tenant, cpId, enabled));
     }
 
     /** Registers a station. Only registered stations may connect to this central system. */
     @PostMapping
-    public ResponseEntity<ChargePointDTO> createChargePoint(@RequestBody @Valid ChargePointRequest request) {
-        log.info("Registering station {}", request.getCpId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(chargePointRegistryService.createStation(request));
+    public ResponseEntity<ChargePointDTO> createChargePoint(@TenantId String tenant,
+                                                            @RequestBody @Valid ChargePointRequest request) {
+        log.info("Registering station {} in tenant {}", request.getCpId(), tenant);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(chargePointRegistryService.createStation(tenant, request));
     }
 
     /** Updates a station. The {@code cpId} identifies it and cannot be changed. */
     @PutMapping
-    public ResponseEntity<ChargePointDTO> updateChargePoint(@RequestParam String cpId,
+    public ResponseEntity<ChargePointDTO> updateChargePoint(@TenantId String tenant,
+                                                            @RequestParam String cpId,
                                                             @RequestBody @Valid ChargePointRequest request) {
-        log.info("Updating station {}", cpId);
-        return ResponseEntity.ok(chargePointRegistryService.updateStation(cpId, request));
+        log.info("Updating station {} of tenant {}", cpId, tenant);
+        return ResponseEntity.ok(chargePointRegistryService.updateStation(tenant, cpId, request));
     }
 
     /** Enables or disables a station. A disabled station is refused when it tries to connect. */
     @PatchMapping("/enabled")
-    public ResponseEntity<ChargePointDTO> setChargePointEnabled(@RequestParam String cpId,
+    public ResponseEntity<ChargePointDTO> setChargePointEnabled(@TenantId String tenant,
+                                                                @RequestParam String cpId,
                                                                 @RequestParam boolean enabled) {
-        log.info("Setting station {} enabled -> {}", cpId, enabled);
-        return ResponseEntity.ok(chargePointRegistryService.setStationEnabled(cpId, enabled));
+        log.info("Setting station {} of tenant {} enabled -> {}", cpId, tenant, enabled);
+        return ResponseEntity.ok(chargePointRegistryService.setStationEnabled(tenant, cpId, enabled));
     }
 
     /**
@@ -73,63 +82,71 @@ public class ChargePointController {
      * {@code action} tells apart.
      */
     @DeleteMapping
-    public ResponseEntity<ChargePointDeletionResultDTO> deleteChargePoint(@RequestParam String cpId) {
-        log.info("Deleting station {}", cpId);
-        return ResponseEntity.ok(chargePointRegistryService.deleteStation(cpId));
+    public ResponseEntity<ChargePointDeletionResultDTO> deleteChargePoint(@TenantId String tenant,
+                                                                         @RequestParam String cpId) {
+        log.info("Deleting station {} of tenant {}", cpId, tenant);
+        return ResponseEntity.ok(chargePointRegistryService.deleteStation(tenant, cpId));
     }
 
     @PostMapping("/hard-reset")
-    public ResponseEntity<Boolean> triggerHardReset(@RequestParam String cpId) {
-        return ResponseEntity.ok(chargePointService.sendResetRequestToChargePoint(ResetType.Hard, cpId));
+    public ResponseEntity<Boolean> triggerHardReset(@TenantId String tenant, @RequestParam String cpId) {
+        return ResponseEntity.ok(chargePointService.sendResetRequestToChargePoint(tenant, ResetType.Hard, cpId));
     }
 
     @PostMapping("/soft-reset")
-    public ResponseEntity<Boolean> triggerSoftReset(@RequestParam String cpId) {
-        return ResponseEntity.ok(chargePointService.sendResetRequestToChargePoint(ResetType.Soft, cpId));
+    public ResponseEntity<Boolean> triggerSoftReset(@TenantId String tenant, @RequestParam String cpId) {
+        return ResponseEntity.ok(chargePointService.sendResetRequestToChargePoint(tenant, ResetType.Soft, cpId));
     }
 
     @PostMapping("/connector-unlock")
-    public ResponseEntity<Boolean> triggerConnectorUnlock(@RequestParam String cpId,
+    public ResponseEntity<Boolean> triggerConnectorUnlock(@TenantId String tenant,
+                                                          @RequestParam String cpId,
                                                           @RequestParam int connectorId) {
-        return ResponseEntity.ok(chargePointService.sendConnectorUnlockToChargePoint(cpId, connectorId));
+        return ResponseEntity.ok(chargePointService.sendConnectorUnlockToChargePoint(tenant, cpId, connectorId));
     }
 
     @PostMapping("/status-notification")
-    public ResponseEntity<Boolean> triggerStatusNotificationRequest(@RequestParam String cpId,
-                                                                    @RequestParam int connectorId) {
+    public ResponseEntity<Boolean> triggerStatusNotificationRequest(@TenantId String tenant,
+                                                                   @RequestParam String cpId,
+                                                                   @RequestParam int connectorId) {
         return ResponseEntity.ok(chargePointService.sendTriggerMessageRequestToChargePoint(
-                cpId, connectorId, TriggerMessageRequestType.StatusNotification
+                tenant, cpId, connectorId, TriggerMessageRequestType.StatusNotification
         ));
     }
 
     @PostMapping("/boot-notification")
-    public ResponseEntity<Boolean> triggerBootNotificationRequest(@RequestParam String cpId,
-                                                                  @RequestParam int connectorId) {
+    public ResponseEntity<Boolean> triggerBootNotificationRequest(@TenantId String tenant,
+                                                                 @RequestParam String cpId,
+                                                                 @RequestParam int connectorId) {
         return ResponseEntity.ok(chargePointService.sendTriggerMessageRequestToChargePoint(
-                cpId, connectorId, TriggerMessageRequestType.BootNotification
+                tenant, cpId, connectorId, TriggerMessageRequestType.BootNotification
         ));
     }
 
     @PostMapping("/heartbeat")
-    public ResponseEntity<Boolean> triggerHeartBeatRequest(@RequestParam String cpId,
-                                                           @RequestParam int connectorId) {
+    public ResponseEntity<Boolean> triggerHeartBeatRequest(@TenantId String tenant,
+                                                          @RequestParam String cpId,
+                                                          @RequestParam int connectorId) {
         return ResponseEntity.ok(chargePointService.sendTriggerMessageRequestToChargePoint(
-                cpId, connectorId, TriggerMessageRequestType.Heartbeat
+                tenant, cpId, connectorId, TriggerMessageRequestType.Heartbeat
         ));
     }
 
     @PostMapping("/meter-values")
-    public ResponseEntity<Boolean> triggerMeterValuesRequest(@RequestParam String cpId,
-                                                             @RequestParam int connectorId) {
+    public ResponseEntity<Boolean> triggerMeterValuesRequest(@TenantId String tenant,
+                                                            @RequestParam String cpId,
+                                                            @RequestParam int connectorId) {
         return ResponseEntity.ok(chargePointService.sendTriggerMessageRequestToChargePoint(
-                cpId, connectorId, TriggerMessageRequestType.MeterValues
+                tenant, cpId, connectorId, TriggerMessageRequestType.MeterValues
         ));
     }
 
     @PostMapping("/change-configurations")
-    public ResponseEntity<Boolean> triggerChangeConfigurationRequest(@RequestParam String cpId,
-                                                                     @RequestParam String key,
-                                                                     @RequestParam String value) {
-        return ResponseEntity.ok(chargePointService.sendChangeConfigurationRequestToChargePoint(cpId, key, value));
+    public ResponseEntity<Boolean> triggerChangeConfigurationRequest(@TenantId String tenant,
+                                                                    @RequestParam String cpId,
+                                                                    @RequestParam String key,
+                                                                    @RequestParam String value) {
+        return ResponseEntity.ok(chargePointService.sendChangeConfigurationRequestToChargePoint(
+                tenant, cpId, key, value));
     }
 }

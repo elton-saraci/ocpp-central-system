@@ -45,7 +45,11 @@ public class ServerCoreEventHandler {
             @Override
             public AuthorizeConfirmation handleAuthorizeRequest(UUID sessionIndex, AuthorizeRequest request) {
                 log.info("Incoming authorization request sessionIndex -> {},  authorizeRequest tag -> {}", sessionIndex, request.getIdTag());
-                Tag tag = tagService.findEntityByIdTag(request.getIdTag()).orElse(null);
+                // Scoped to the tenant of the station behind the session: a tag registered by one
+                // tenant never authorizes another tenant's station.
+                Tag tag = tenantOf(sessionIndex)
+                        .flatMap(tenant -> tagService.findEntityByIdTag(tenant, request.getIdTag()))
+                        .orElse(null);
                 TagAuthorization authorization = TagAuthorization.of(tag);
                 if (!authorization.isAccepted()) {
                     log.warn("Rejecting idTag {} for sessionIndex {} -> {}", request.getIdTag(), sessionIndex, authorization);
@@ -92,7 +96,14 @@ public class ServerCoreEventHandler {
                     return new MeterValuesConfirmation();
                 }
 
+                Optional<String> tenant = tenantOf(sessionIndex);
+                if (tenant.isEmpty()) {
+                    log.warn("Skipping meter values for sessionIndex {} as no station holds it", sessionIndex);
+                    return new MeterValuesConfirmation();
+                }
+
                 int updatedRows = chargeTransactionRepository.updateMeterValues(
+                        tenant.get(),
                         request.getTransactionId(),
                         currentMeterValue,
                         currentPowerValue,
@@ -123,7 +134,8 @@ public class ServerCoreEventHandler {
                     return new StartTransactionConfirmation(new IdTagInfo(AuthorizationStatus.Accepted), chargeTransaction.getChargeTransactionId());
                 }
 
-                Tag tag = tagService.findEntityByIdTag(request.getIdTag()).orElse(null);
+                ChargePoint chargePoint = chargePointRegistryService.requireStationForSession(websocketId);
+                Tag tag = tagService.findEntityByIdTag(chargePoint.getTenant(), request.getIdTag()).orElse(null);
                 TagAuthorization authorization = TagAuthorization.of(tag);
                 if (!authorization.isAccepted()) {
                     log.warn("Refusing StartTransaction for idTag {} on sessionIndex {} -> {}",
@@ -131,7 +143,6 @@ public class ServerCoreEventHandler {
                     return new StartTransactionConfirmation(toIdTagInfo(authorization, tag), INVALID_TRANSACTION_ID);
                 }
 
-                ChargePoint chargePoint = chargePointRegistryService.requireStationForSession(websocketId);
                 ChargeTransaction chargeTransaction = ChargeTransactionFactory.createNewChargingTransactionFromStart(request, chargePoint, tag);
                 chargeTransactionRepository.save(chargeTransaction);
                 log.info("Created ChargeTransaction {} for idTag {}", chargeTransaction.getChargeTransactionId(), request.getIdTag());
@@ -150,8 +161,10 @@ public class ServerCoreEventHandler {
             public StopTransactionConfirmation handleStopTransactionRequest(UUID sessionIndex,
                                                                             StopTransactionRequest request) {
                 log.info("StopTransactionRequest -> {}, sessionIndex -> {}", request, sessionIndex);
-                int rowsChanged = chargeTransactionRepository.updateStopTransaction(request.getTransactionId(),
-                        request.getMeterStop(), LocalDateTime.now(), false);
+                int rowsChanged = tenantOf(sessionIndex)
+                        .map(tenant -> chargeTransactionRepository.updateStopTransaction(tenant, request.getTransactionId(),
+                                request.getMeterStop(), LocalDateTime.now(), false))
+                        .orElse(0);
                 if(rowsChanged == 0) {
                     log.warn("No charge transaction found on database for id {}", request.getTransactionId());
                     return ConfirmationFactory.generateStopTransactionConfirmation(AuthorizationStatus.Invalid);
@@ -164,6 +177,14 @@ public class ServerCoreEventHandler {
     @Bean
     public ServerCoreProfile createCore(eu.chargetime.ocpp.feature.profile.ServerCoreEventHandler serverCoreEventHandler) {
         return new ServerCoreProfile(serverCoreEventHandler);
+    }
+
+    /**
+     * @return the tenant the session acts for, or empty when no registered station holds it. A
+     *         station that got past the connection gate always resolves one.
+     */
+    private Optional<String> tenantOf(UUID websocketId) {
+        return chargePointRegistryService.findSessionTenant(websocketId);
     }
 
     /** Maps the tag decision onto the OCPP status the charge point understands. */

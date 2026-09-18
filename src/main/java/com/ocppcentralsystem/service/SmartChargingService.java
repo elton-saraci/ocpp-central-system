@@ -60,8 +60,8 @@ public class SmartChargingService {
      * @param connectorId     null means the whole charge point
      * @param durationMinutes how long the limit stays in effect; null means until it is cleared
      */
-    public ChargingProfileResultDTO setPowerLimit(String cpId, Integer connectorId, int powerW, Integer durationMinutes) {
-        ChargePoint chargePoint = chargePointService.requireChargePoint(cpId);
+    public ChargingProfileResultDTO setPowerLimit(String tenant, String cpId, Integer connectorId, int powerW, Integer durationMinutes) {
+        ChargePoint chargePoint = chargePointService.requireChargePoint(tenant, cpId);
         int target = connectorId == null ? WHOLE_CHARGE_POINT : connectorId;
         double limitAmps = toAmperes(powerW);
 
@@ -102,8 +102,8 @@ public class SmartChargingService {
                 schedule);
     }
 
-    public ChargingProfileResultDTO clearPowerLimit(String cpId, Integer connectorId) {
-        ChargePoint chargePoint = chargePointService.requireChargePoint(cpId);
+    public ChargingProfileResultDTO clearPowerLimit(String tenant, String cpId, Integer connectorId) {
+        ChargePoint chargePoint = chargePointService.requireChargePoint(tenant, cpId);
         int target = connectorId == null ? WHOLE_CHARGE_POINT : connectorId;
 
         ClearChargingProfileRequest request = new ClearChargingProfileRequest();
@@ -126,8 +126,8 @@ public class SmartChargingService {
     }
 
     /** Reads back the limit the charge point currently has in effect. */
-    public ChargingScheduleDTO getPowerLimit(String cpId, Integer connectorId, Integer durationMinutes) {
-        ChargePoint chargePoint = chargePointService.requireChargePoint(cpId);
+    public ChargingScheduleDTO getPowerLimit(String tenant, String cpId, Integer connectorId, Integer durationMinutes) {
+        ChargePoint chargePoint = chargePointService.requireChargePoint(tenant, cpId);
         int target = connectorId == null ? WHOLE_CHARGE_POINT : connectorId;
         int windowSeconds = durationMinutes != null && durationMinutes > 0
                 ? durationMinutes * SECONDS_PER_MINUTE

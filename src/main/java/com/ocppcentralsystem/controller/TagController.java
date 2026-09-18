@@ -8,6 +8,7 @@ import com.ocppcentralsystem.model.TagStatus;
 import com.ocppcentralsystem.model.TagStatusUpdateRequest;
 import com.ocppcentralsystem.model.TagType;
 import com.ocppcentralsystem.service.TagService;
+import com.ocppcentralsystem.tenant.TenantId;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,46 +40,52 @@ public class TagController {
     /** Lists tags, optionally filtered by status, type or a free-text search term. */
     @GetMapping
     public ResponseEntity<List<TagDTO>> fetchTags(
+            @TenantId String tenant,
             @RequestParam(required = false) TagStatus status,
             @RequestParam(required = false) TagType tagType,
             @RequestParam(required = false) String search) {
-        log.info("Fetching tags, status -> {}, tagType -> {}, search -> {}", status, tagType, search);
-        return ResponseEntity.ok(tagService.findAllTags(status, tagType, search));
+        log.info("Fetching tags of tenant {}, status -> {}, tagType -> {}, search -> {}",
+                tenant, status, tagType, search);
+        return ResponseEntity.ok(tagService.findAllTags(tenant, status, tagType, search));
     }
 
     @GetMapping("/{idTag}")
-    public ResponseEntity<TagDTO> fetchTagByIdTag(@PathVariable String idTag) {
+    public ResponseEntity<TagDTO> fetchTagByIdTag(@TenantId String tenant, @PathVariable String idTag) {
         log.info("Fetching tag -> {}", idTag);
-        return ResponseEntity.ok(tagService.findTagByIdTag(idTag));
+        return ResponseEntity.ok(tagService.findTagByIdTag(tenant, idTag));
     }
 
     /** Lists the transactions that used this tag, newest first. */
     @GetMapping("/{idTag}/transactions")
-    public ResponseEntity<List<ChargeTransactionDTO>> fetchTransactionsByTag(@PathVariable String idTag) {
+    public ResponseEntity<List<ChargeTransactionDTO>> fetchTransactionsByTag(@TenantId String tenant,
+                                                                            @PathVariable String idTag) {
         log.info("Fetching transactions for tag -> {}", idTag);
-        return ResponseEntity.ok(tagService.findTransactionsByTag(idTag));
+        return ResponseEntity.ok(tagService.findTransactionsByTag(tenant, idTag));
     }
 
     @PostMapping
-    public ResponseEntity<TagDTO> createTag(@RequestBody @Valid TagRequest tagRequest) {
-        log.info("Creating tag -> {}", tagRequest);
-        return ResponseEntity.status(HttpStatus.CREATED).body(tagService.createTag(tagRequest));
+    public ResponseEntity<TagDTO> createTag(@TenantId String tenant,
+                                           @RequestBody @Valid TagRequest tagRequest) {
+        log.info("Creating tag -> {} in tenant {}", tagRequest, tenant);
+        return ResponseEntity.status(HttpStatus.CREATED).body(tagService.createTag(tenant, tagRequest));
     }
 
     /** Updates the customer details of a tag. The idTag itself cannot be changed. */
     @PutMapping("/{idTag}")
-    public ResponseEntity<TagDTO> updateTag(@PathVariable String idTag,
+    public ResponseEntity<TagDTO> updateTag(@TenantId String tenant,
+                                           @PathVariable String idTag,
                                            @RequestBody @Valid TagRequest tagRequest) {
         log.info("Updating tag -> {} with {}", idTag, tagRequest);
-        return ResponseEntity.ok(tagService.updateTag(idTag, tagRequest));
+        return ResponseEntity.ok(tagService.updateTag(tenant, idTag, tagRequest));
     }
 
     /** Activates or blocks a tag, e.g. {@code {"status": "BLOCKED"}}. */
     @PatchMapping("/{idTag}/status")
-    public ResponseEntity<TagDTO> updateTagStatus(@PathVariable String idTag,
+    public ResponseEntity<TagDTO> updateTagStatus(@TenantId String tenant,
+                                                  @PathVariable String idTag,
                                                   @RequestBody @Valid TagStatusUpdateRequest request) {
         log.info("Updating status of tag -> {} to {}", idTag, request.getStatus());
-        return ResponseEntity.ok(tagService.updateTagStatus(idTag, request.getStatus()));
+        return ResponseEntity.ok(tagService.updateTagStatus(tenant, idTag, request.getStatus()));
     }
 
     /**
@@ -86,8 +93,9 @@ public class TagController {
      * check the returned {@code action} to see which happened.
      */
     @DeleteMapping("/{idTag}")
-    public ResponseEntity<TagDeletionResultDTO> deleteTag(@PathVariable String idTag) {
+    public ResponseEntity<TagDeletionResultDTO> deleteTag(@TenantId String tenant,
+                                                         @PathVariable String idTag) {
         log.info("Deleting tag -> {}", idTag);
-        return ResponseEntity.ok(tagService.deleteTag(idTag));
+        return ResponseEntity.ok(tagService.deleteTag(tenant, idTag));
     }
 }

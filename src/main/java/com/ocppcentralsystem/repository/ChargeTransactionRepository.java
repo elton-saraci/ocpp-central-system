@@ -37,11 +37,15 @@ public interface ChargeTransactionRepository extends JpaRepository<ChargeTransac
     """)
     Optional<UUID> findChargePointWebsocketId(@Param("transactionId") int transactionId);
 
-    List<ChargeTransaction> findByTag_IdTagOrderByLastUpdatedDesc(String idTag);
+    List<ChargeTransaction> findByTenantAndTag_IdTagOrderByLastUpdatedDesc(String tenant, String idTag);
 
-    long countByTag_IdTag(String idTag);
+    List<ChargeTransaction> findByTenant(String tenant);
 
-    long countByChargePoint_CpId(String cpId);
+    Optional<ChargeTransaction> findByTenantAndChargeTransactionId(String tenant, int chargeTransactionId);
+
+    long countByTenantAndTag_IdTag(String tenant, String idTag);
+
+    long countByTenantAndChargePoint_CpId(String tenant, String cpId);
 
     @Modifying
     @Transactional
@@ -52,8 +56,10 @@ public interface ChargeTransactionRepository extends JpaRepository<ChargeTransac
         ct.latestMeterValue = :meterStop,
         ct.isActive = :isActive
     WHERE ct.chargeTransactionId = :transactionId
+      AND ct.tenant = :tenant
     """)
-    int updateStopTransaction(@Param("transactionId") int transactionId,
+    int updateStopTransaction(@Param("tenant") String tenant,
+                              @Param("transactionId") int transactionId,
                               @Param("meterStop") Integer meterStop,
                               @Param("lastUpdated") LocalDateTime lastUpdated,
                               @Param("isActive") boolean isActive);
@@ -67,8 +73,10 @@ public interface ChargeTransactionRepository extends JpaRepository<ChargeTransac
         ct.connectorId = :connectorId,
         ct.lastUpdated = :lastUpdated
     WHERE ct.chargeTransactionId = :transactionId
+      AND ct.tenant = :tenant
     """)
-    int updateMeterValues(@Param("transactionId") int transactionId,
+    int updateMeterValues(@Param("tenant") String tenant,
+                          @Param("transactionId") int transactionId,
                           @Param("meterValue") Integer meterValue,
                           @Param("powerValue") Integer powerValue,
                           @Param("connectorId") Integer connectorId,

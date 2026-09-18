@@ -54,10 +54,15 @@ public class ChargePoint {
     @Column(nullable = false, length = 100)
     private String cpId;
 
+    /**
+     * The tenant the station belongs to. Only that tenant can see or operate it, and a session
+     * inherits the tenant of the station it connected as.
+     */
+    @Column(nullable = false, length = 50)
+    private String tenant;
+
     /** Label an operator can set; OCPP has no notion of a station name. */
     private String name;
-
-    // ── reported by the station on BootNotification ─────────────────────────
 
     private String vendor;
     private String model;

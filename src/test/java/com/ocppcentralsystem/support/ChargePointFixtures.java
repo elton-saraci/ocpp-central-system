@@ -25,6 +25,7 @@ public final class ChargePointFixtures {
 
     public static ChargePoint connectedStation(String cpId, UUID websocketId) {
         return ChargePoint.builder()
+                .tenant(TestTenants.DEFAULT)
                 .cpId(cpId)
                 .websocketId(websocketId)
                 .connectionStatus(WebsocketConnectionStatus.OPEN)

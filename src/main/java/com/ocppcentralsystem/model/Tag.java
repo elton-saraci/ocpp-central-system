@@ -34,6 +34,13 @@ public class Tag {
     @Column(nullable = false, length = 20)
     private String idTag;
 
+    /**
+     * The tenant the tag belongs to. An OCPP Authorize is answered from the tenant of the station
+     * that asked, so the same idTag cannot be shared between tenants.
+     */
+    @Column(nullable = false, length = 50)
+    private String tenant;
+
     @Column(nullable = false, length = 100)
     private String customerName;
 

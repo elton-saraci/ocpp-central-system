@@ -16,6 +16,7 @@ import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import com.ocppcentralsystem.repository.TagRepository;
 import com.ocppcentralsystem.support.ChargePointFixtures;
+import com.ocppcentralsystem.support.TestTenants;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +39,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Transactional
 class TagServiceIntegrationTest {
 
+    private static final String TENANT = TestTenants.DEFAULT;
+
     @Autowired
     private TagService tagService;
     @Autowired
@@ -53,8 +56,8 @@ class TagServiceIntegrationTest {
 
     @Test
     void transactionReferencesTagAndTagIsBlockedInsteadOfDeleted() {
-        tagService.createTag(request("RFID-TEST", "Test Customer", TagType.RFID, LocalDateTime.now().plusDays(1)));
-        assertEquals(TagAuthorization.ACCEPTED, tagService.authorize("RFID-TEST"));
+        tagService.createTag(TENANT, request("RFID-TEST", "Test Customer", TagType.RFID, LocalDateTime.now().plusDays(1)));
+        assertEquals(TagAuthorization.ACCEPTED, tagService.authorize(TENANT, "RFID-TEST"));
 
         ChargePoint chargePoint = chargePointRepository.save(ChargePointFixtures.connectedStation("CP-TAG-TEST"));
 
@@ -63,7 +66,8 @@ class TagServiceIntegrationTest {
         entityManager.flush();
         entityManager.clear();
 
-        List<ChargeTransaction> transactions = chargeTransactionRepository.findByTag_IdTagOrderByLastUpdatedDesc("RFID-TEST");
+        List<ChargeTransaction> transactions = chargeTransactionRepository
+                .findByTenantAndTag_IdTagOrderByLastUpdatedDesc(TENANT, "RFID-TEST");
         assertEquals(1, transactions.size());
         assertEquals("RFID-TEST", transactions.getFirst().getIdTag());
         assertEquals("Test Customer", transactions.getFirst().getTag().getCustomerName());
@@ -72,35 +76,35 @@ class TagServiceIntegrationTest {
         assertEquals("RFID-TEST", dto.getIdTag());
         assertEquals("CP-TAG-TEST", dto.getCpId());
 
-        assertEquals(1, tagService.findTransactionsByTag("RFID-TEST").size());
+        assertEquals(1, tagService.findTransactionsByTag(TENANT, "RFID-TEST").size());
 
-        TagDeletionResultDTO result = tagService.deleteTag("RFID-TEST");
+        TagDeletionResultDTO result = tagService.deleteTag(TENANT, "RFID-TEST");
         assertEquals(TagDeletionAction.BLOCKED, result.getAction());
         assertEquals(1L, result.getTransactionCount());
         assertTrue(tagRepository.existsById("RFID-TEST"));
         assertEquals(TagStatus.BLOCKED, tagRepository.findById("RFID-TEST").orElseThrow().getStatus());
-        assertEquals(TagAuthorization.BLOCKED, tagService.authorize("RFID-TEST"));
+        assertEquals(TagAuthorization.BLOCKED, tagService.authorize(TENANT, "RFID-TEST"));
     }
 
     @Test
     void unknownBlockedAndExpiredTagsAreRejected() {
-        assertEquals(TagAuthorization.UNKNOWN, tagService.authorize("DOES-NOT-EXIST"));
-        assertFalse(tagService.authorize("DOES-NOT-EXIST").isAccepted());
+        assertEquals(TagAuthorization.UNKNOWN, tagService.authorize(TENANT, "DOES-NOT-EXIST"));
+        assertFalse(tagService.authorize(TENANT, "DOES-NOT-EXIST").isAccepted());
 
-        tagService.createTag(request("BLOCKED-TEST", "Blocked Customer", TagType.RFID, LocalDateTime.now().plusDays(1)));
-        tagService.updateTagStatus("BLOCKED-TEST", TagStatus.BLOCKED);
-        assertEquals(TagAuthorization.BLOCKED, tagService.authorize("BLOCKED-TEST"));
+        tagService.createTag(TENANT, request("BLOCKED-TEST", "Blocked Customer", TagType.RFID, LocalDateTime.now().plusDays(1)));
+        tagService.updateTagStatus(TENANT, "BLOCKED-TEST", TagStatus.BLOCKED);
+        assertEquals(TagAuthorization.BLOCKED, tagService.authorize(TENANT, "BLOCKED-TEST"));
 
-        tagService.createTag(request("EXPIRED-TEST", "Expired Customer", TagType.APP, LocalDateTime.now().minusDays(1)));
-        assertEquals(TagAuthorization.EXPIRED, tagService.authorize("EXPIRED-TEST"));
-        assertFalse(tagService.findTagByIdTag("EXPIRED-TEST").isUsable());
+        tagService.createTag(TENANT, request("EXPIRED-TEST", "Expired Customer", TagType.APP, LocalDateTime.now().minusDays(1)));
+        assertEquals(TagAuthorization.EXPIRED, tagService.authorize(TENANT, "EXPIRED-TEST"));
+        assertFalse(tagService.findTagByIdTag(TENANT, "EXPIRED-TEST").isUsable());
     }
 
     @Test
     void tagWithoutTransactionsIsDeletedForReal() {
-        tagService.createTag(request("ORPHAN-TEST", "Orphan Customer", TagType.APP, null));
+        tagService.createTag(TENANT, request("ORPHAN-TEST", "Orphan Customer", TagType.APP, null));
 
-        TagDeletionResultDTO result = tagService.deleteTag("ORPHAN-TEST");
+        TagDeletionResultDTO result = tagService.deleteTag(TENANT, "ORPHAN-TEST");
 
         assertEquals(TagDeletionAction.DELETED, result.getAction());
         assertEquals(0L, result.getTransactionCount());
@@ -109,9 +113,9 @@ class TagServiceIntegrationTest {
 
     @Test
     void tagWithoutExpiryHasNoExpiryDateInDtoAndStaysUsable() {
-        tagService.createTag(request("REMOTE-TEST", "No Expiry Customer", TagType.REMOTE, null));
+        tagService.createTag(TENANT, request("REMOTE-TEST", "No Expiry Customer", TagType.REMOTE, null));
 
-        var dto = tagService.findTagByIdTag("REMOTE-TEST");
+        var dto = tagService.findTagByIdTag(TENANT, "REMOTE-TEST");
 
         assertEquals(TagStatus.ACTIVE, dto.getStatus());
         assertEquals("ACTIVE", dto.getEffectiveStatus());
@@ -121,7 +125,7 @@ class TagServiceIntegrationTest {
 
     @Test
     void entityMaintainsItsOwnTimestamps() {
-        TagDTO created = tagService.createTag(request("STAMP-TEST", "Stamp Customer", TagType.RFID, null));
+        TagDTO created = tagService.createTag(TENANT, request("STAMP-TEST", "Stamp Customer", TagType.RFID, null));
 
         // The timestamps survive into the API response, not just the database row.
         assertNotNull(created.getCreatedAt());
@@ -142,25 +146,26 @@ class TagServiceIntegrationTest {
 
     @Test
     void tagListAppliesOnlyTheFiltersThatWereGiven() {
-        tagService.createTag(request("FILTER-ACTIVE", "Alice Anderson", TagType.RFID, null));
-        tagService.createTag(request("FILTER-BLOCKED", "Bob Brown", TagType.RFID, null));
-        tagService.createTag(request("FILTER-APP", "Carol Clark", TagType.APP, null));
-        tagService.updateTagStatus("FILTER-BLOCKED", TagStatus.BLOCKED);
+        tagService.createTag(TENANT, request("FILTER-ACTIVE", "Alice Anderson", TagType.RFID, null));
+        tagService.createTag(TENANT, request("FILTER-BLOCKED", "Bob Brown", TagType.RFID, null));
+        tagService.createTag(TENANT, request("FILTER-APP", "Carol Clark", TagType.APP, null));
+        tagService.updateTagStatus(TENANT, "FILTER-BLOCKED", TagStatus.BLOCKED);
 
-        assertEquals(3, tagService.findAllTags(null, null, null).size());
-        assertEquals(2, tagService.findAllTags(TagStatus.ACTIVE, null, null).size());
-        assertEquals(1, tagService.findAllTags(null, TagType.APP, null).size());
-        assertEquals(1, tagService.findAllTags(TagStatus.BLOCKED, TagType.RFID, null).size());
+        assertEquals(3, tagService.findAllTags(TENANT, null, null, null).size());
+        assertEquals(2, tagService.findAllTags(TENANT, TagStatus.ACTIVE, null, null).size());
+        assertEquals(1, tagService.findAllTags(TENANT, null, TagType.APP, null).size());
+        assertEquals(1, tagService.findAllTags(TENANT, TagStatus.BLOCKED, TagType.RFID, null).size());
 
         // search matches the customer name or the tag identifier, ignoring case
-        assertEquals(1, tagService.findAllTags(null, null, "anderson").size());
-        assertEquals(1, tagService.findAllTags(null, null, "FILTER-APP").size());
-        assertEquals(3, tagService.findAllTags(null, null, "filter-").size());
-        assertEquals(1, tagService.findAllTags(TagStatus.BLOCKED, null, "bob").size());
+        assertEquals(1, tagService.findAllTags(TENANT, null, null, "anderson").size());
+        assertEquals(1, tagService.findAllTags(TENANT, null, null, "FILTER-APP").size());
+        assertEquals(3, tagService.findAllTags(TENANT, null, null, "filter-").size());
+        assertEquals(1, tagService.findAllTags(TENANT, TagStatus.BLOCKED, null, "bob").size());
 
-        assertTrue(tagService.findAllTags(null, null, "nobody").isEmpty());
-        assertTrue(tagService.findAllTags(TagStatus.BLOCKED, TagType.APP, null).isEmpty());
-        assertEquals("Alice Anderson", tagService.findAllTags(null, null, null).getFirst().getCustomerName());
+        assertTrue(tagService.findAllTags(TENANT, null, null, "nobody").isEmpty());
+        assertTrue(tagService.findAllTags(TENANT, TagStatus.BLOCKED, TagType.APP, null).isEmpty());
+        assertEquals("Alice Anderson",
+                tagService.findAllTags(TENANT, null, null, null).getFirst().getCustomerName());
     }
 
     private TagRequest request(String idTag, String customerName, TagType tagType, LocalDateTime expiryDate) {

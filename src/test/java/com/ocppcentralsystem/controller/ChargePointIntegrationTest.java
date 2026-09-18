@@ -7,6 +7,7 @@ import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.service.ChargePointRegistryService;
 import com.ocppcentralsystem.service.ChargePointService;
 import com.ocppcentralsystem.support.ChargePointFixtures;
+import com.ocppcentralsystem.support.TestTenants;
 import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.feature.profile.ServerCoreEventHandler;
 import eu.chargetime.ocpp.model.Confirmation;
@@ -71,6 +72,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ChargePointIntegrationTest {
 
     private static final String CP_ID = "CP-1";
+    private static final String TENANT = TestTenants.DEFAULT;
 
     @Autowired
     private MockMvc mockMvc;
@@ -159,21 +161,21 @@ class ChargePointIntegrationTest {
         save();
         answerWith(new ResetConfirmation(ResetStatus.Accepted));
 
-        assertTrue(chargePointService.sendResetRequestToChargePoint(ResetType.Hard, CP_ID));
+        assertTrue(chargePointService.sendResetRequestToChargePoint(TENANT, ResetType.Hard, CP_ID));
     }
 
     @Test
     void remoteOperationsRejectAnUnknownChargePoint() throws Exception {
         ResourceNotFoundException notFound = assertThrows(ResourceNotFoundException.class,
-                () -> chargePointService.sendResetRequestToChargePoint(ResetType.Hard, "CP-GHOST"));
+                () -> chargePointService.sendResetRequestToChargePoint(TENANT, ResetType.Hard, "CP-GHOST"));
         assertEquals("CHARGE_POINT_NOT_FOUND", notFound.getCode());
 
         assertThrows(ResourceNotFoundException.class,
-                () -> chargePointService.sendConnectorUnlockToChargePoint("CP-GHOST", 1));
+                () -> chargePointService.sendConnectorUnlockToChargePoint(TENANT, "CP-GHOST", 1));
         assertThrows(ResourceNotFoundException.class,
-                () -> chargePointService.sendTriggerMessageRequestToChargePoint("CP-GHOST", 1, TriggerMessageRequestType.Heartbeat));
+                () -> chargePointService.sendTriggerMessageRequestToChargePoint(TENANT, "CP-GHOST", 1, TriggerMessageRequestType.Heartbeat));
         assertThrows(ResourceNotFoundException.class,
-                () -> chargePointService.sendChangeConfigurationRequestToChargePoint("CP-GHOST", "key", "value"));
+                () -> chargePointService.sendChangeConfigurationRequestToChargePoint(TENANT, "CP-GHOST", "key", "value"));
 
         verify(jsonServer, never()).send(any(UUID.class), any(Request.class));
     }
@@ -192,8 +194,8 @@ class ChargePointIntegrationTest {
             throw new AssertionError("Unexpected request: " + request.getClass().getSimpleName());
         });
 
-        assertTrue(chargePointService.sendConnectorUnlockToChargePoint(CP_ID, 1));
-        assertTrue(chargePointService.sendTriggerMessageRequestToChargePoint(CP_ID, 1,
+        assertTrue(chargePointService.sendConnectorUnlockToChargePoint(TENANT, CP_ID, 1));
+        assertTrue(chargePointService.sendTriggerMessageRequestToChargePoint(TENANT, CP_ID, 1,
                 TriggerMessageRequestType.Heartbeat));
     }
 

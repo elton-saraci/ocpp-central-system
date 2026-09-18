@@ -12,6 +12,7 @@ import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import com.ocppcentralsystem.repository.TagRepository;
 import com.ocppcentralsystem.support.ChargePointFixtures;
+import com.ocppcentralsystem.support.TestTenants;
 import com.ocppcentralsystem.util.MeterValuesUtility;
 import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.feature.profile.ServerCoreEventHandler;
@@ -68,6 +69,7 @@ import static org.mockito.Mockito.when;
 class ChargeTransactionIntegrationTest {
 
     private static final String CP_ID = "CP-TX-1";
+    private static final String TENANT = TestTenants.DEFAULT;
 
     @Autowired
     private ChargeTransactionService chargeTransactionService;
@@ -89,6 +91,7 @@ class ChargeTransactionIntegrationTest {
 
     @Test
     void authorizeMapsTheTagStateOntoTheOcppStatus() {
+        registerChargePoint();
         tagRepository.save(tag("TX-ACTIVE", TagStatus.ACTIVE, LocalDateTime.now().plusDays(1)));
         tagRepository.save(tag("TX-BLOCKED", TagStatus.BLOCKED, LocalDateTime.now().plusDays(1)));
         tagRepository.save(tag("TX-EXPIRED", TagStatus.ACTIVE, LocalDateTime.now().minusDays(1)));
@@ -100,6 +103,15 @@ class ChargeTransactionIntegrationTest {
 
         // The expiry date travels back to the charge point so it knows when to re-authorize.
         assertNotNull(authorize("TX-ACTIVE").getIdTagInfo().getExpiryDate());
+    }
+
+    @Test
+    void authorizeFromASessionWithoutARegisteredStationCannotAcceptATag() {
+        // The tenant of a session comes from the station behind it, so an unknown session has no
+        // tenant to look the tag up in.
+        assertEquals(AuthorizationStatus.Invalid,
+                coreEventHandler.handleAuthorizeRequest(UUID.randomUUID(), new AuthorizeRequest("TX-ACTIVE"))
+                        .getIdTagInfo().getStatus());
     }
 
     @Test
@@ -169,8 +181,8 @@ class ChargeTransactionIntegrationTest {
         assertEquals(AuthorizationStatus.Expired, start("TX-EXPIRED").getIdTagInfo().getStatus());
 
         // A rejected start must not leave a transaction behind.
-        assertTrue(chargeTransactionRepository.findByTag_IdTagOrderByLastUpdatedDesc("TX-BLOCKED").isEmpty());
-        assertTrue(chargeTransactionRepository.findByTag_IdTagOrderByLastUpdatedDesc("TX-EXPIRED").isEmpty());
+        assertTrue(chargeTransactionRepository.findByTenantAndTag_IdTagOrderByLastUpdatedDesc(TENANT, "TX-BLOCKED").isEmpty());
+        assertTrue(chargeTransactionRepository.findByTenantAndTag_IdTagOrderByLastUpdatedDesc(TENANT, "TX-EXPIRED").isEmpty());
     }
 
     @Test
@@ -185,7 +197,8 @@ class ChargeTransactionIntegrationTest {
                 new StartTransactionRequest(2, "TX-TAG", 80, ZonedDateTime.now()));
 
         assertEquals(firstId, second.getTransactionId());
-        assertEquals(1, chargeTransactionRepository.findByTag_IdTagOrderByLastUpdatedDesc("TX-TAG").size());
+        assertEquals(1, chargeTransactionRepository
+                .findByTenantAndTag_IdTagOrderByLastUpdatedDesc(TENANT, "TX-TAG").size());
 
         ChargeTransaction reloaded = reloadTransaction(firstId);
         assertEquals(2, reloaded.getConnectorId());
@@ -209,7 +222,7 @@ class ChargeTransactionIntegrationTest {
         answerWith(_ -> new RemoteStartTransactionConfirmation(RemoteStartStopStatus.Accepted));
 
         ChargeTransactionDTO transaction = chargeTransactionService.startChargeTransaction(
-                new ChargeTransactionRequest(CP_ID, 1, "TX-TAG"));
+                TENANT, new ChargeTransactionRequest(CP_ID, 1, "TX-TAG"));
 
         assertNotNull(transaction);
         assertTrue(transaction.isActive());
@@ -225,7 +238,7 @@ class ChargeTransactionIntegrationTest {
         answerWith(_ -> new RemoteStartTransactionConfirmation(RemoteStartStopStatus.Rejected));
 
         ChargeTransactionDTO transaction = chargeTransactionService.startChargeTransaction(
-                new ChargeTransactionRequest(CP_ID, 1, "TX-TAG"));
+                TENANT, new ChargeTransactionRequest(CP_ID, 1, "TX-TAG"));
 
         assertNotNull(transaction);
         assertFalse(transaction.isActive());
@@ -238,15 +251,18 @@ class ChargeTransactionIntegrationTest {
 
         // Unknown charge point, unknown tag and blocked tag are all rejected up front.
         ResourceNotFoundException unknownChargePoint = assertThrows(ResourceNotFoundException.class,
-                () -> chargeTransactionService.startChargeTransaction(new ChargeTransactionRequest("CP-GHOST", 1, "TX-TAG")));
+                () -> chargeTransactionService.startChargeTransaction(TENANT,
+                        new ChargeTransactionRequest("CP-GHOST", 1, "TX-TAG")));
         assertEquals("CHARGE_POINT_NOT_FOUND", unknownChargePoint.getCode());
 
         ResourceNotFoundException unknownTag = assertThrows(ResourceNotFoundException.class,
-                () -> chargeTransactionService.startChargeTransaction(new ChargeTransactionRequest(CP_ID, 1, "TX-NOWHERE")));
+                () -> chargeTransactionService.startChargeTransaction(TENANT,
+                        new ChargeTransactionRequest(CP_ID, 1, "TX-NOWHERE")));
         assertEquals("TAG_NOT_FOUND", unknownTag.getCode());
 
         TagNotAuthorizedException blocked = assertThrows(TagNotAuthorizedException.class,
-                () -> chargeTransactionService.startChargeTransaction(new ChargeTransactionRequest(CP_ID, 1, "TX-BLOCKED")));
+                () -> chargeTransactionService.startChargeTransaction(TENANT,
+                        new ChargeTransactionRequest(CP_ID, 1, "TX-BLOCKED")));
         assertEquals("TAG_NOT_AUTHORIZED", blocked.getCode());
 
         verify(jsonServer, never()).send(any(UUID.class), any(Request.class));
@@ -255,7 +271,7 @@ class ChargeTransactionIntegrationTest {
     @Test
     void remoteStopRejectsAnUnknownTransactionAndReportsWhatTheChargePointAnswered() throws Exception {
         ResourceNotFoundException notFound = assertThrows(ResourceNotFoundException.class,
-                () -> chargeTransactionService.stopChargeTransaction(4242));
+                () -> chargeTransactionService.stopChargeTransaction(TENANT, 4242));
         assertEquals("CHARGE_TRANSACTION_NOT_FOUND", notFound.getCode());
 
         registerChargePoint();
@@ -264,7 +280,7 @@ class ChargeTransactionIntegrationTest {
 
         answerWith(_ -> new RemoteStopTransactionConfirmation(RemoteStartStopStatus.Accepted));
 
-        assertTrue(chargeTransactionService.stopChargeTransaction(transactionId));
+        assertTrue(chargeTransactionService.stopChargeTransaction(TENANT, transactionId));
     }
 
     @Test
@@ -273,11 +289,11 @@ class ChargeTransactionIntegrationTest {
         tagRepository.save(tag("TX-TAG", TagStatus.ACTIVE, null));
         int transactionId = start("TX-TAG").getTransactionId();
 
-        assertEquals("TX-TAG", chargeTransactionService.findChargeTransactionById(transactionId).getIdTag());
-        assertEquals(1, chargeTransactionService.findAllChargingTransactions().size());
+        assertEquals("TX-TAG", chargeTransactionService.findChargeTransactionById(TENANT, transactionId).getIdTag());
+        assertEquals(1, chargeTransactionService.findAllChargingTransactions(TENANT).size());
 
         ResourceNotFoundException notFound = assertThrows(ResourceNotFoundException.class,
-                () -> chargeTransactionService.findChargeTransactionById(4242));
+                () -> chargeTransactionService.findChargeTransactionById(TENANT, 4242));
         assertEquals("CHARGE_TRANSACTION_NOT_FOUND", notFound.getCode());
     }
 
@@ -292,7 +308,8 @@ class ChargeTransactionIntegrationTest {
     }
 
     private AuthorizeConfirmation authorize(String idTag) {
-        return coreEventHandler.handleAuthorizeRequest(UUID.randomUUID(), new AuthorizeRequest(idTag));
+        // Over the session of the registered station: that is where the tenant comes from.
+        return coreEventHandler.handleAuthorizeRequest(websocketId, new AuthorizeRequest(idTag));
     }
 
     /**
@@ -320,6 +337,7 @@ class ChargeTransactionIntegrationTest {
 
     private Tag tag(String idTag, TagStatus status, LocalDateTime expiryDate) {
         return Tag.builder()
+                .tenant(TENANT)
                 .idTag(idTag)
                 .customerName("Customer " + idTag)
                 .tagType(TagType.RFID)

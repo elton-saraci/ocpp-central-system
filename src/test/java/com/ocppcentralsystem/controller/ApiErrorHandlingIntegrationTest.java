@@ -6,6 +6,7 @@ import com.ocppcentralsystem.model.TagType;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.TagRepository;
 import com.ocppcentralsystem.support.ChargePointFixtures;
+import com.ocppcentralsystem.support.TestTenants;
 import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.model.Request;
 import org.junit.jupiter.api.Test;
@@ -125,6 +126,7 @@ class ApiErrorHandlingIntegrationTest {
     void blockedTagCannotStartACharge() throws Exception {
         registerChargePoint();
         tagRepository.save(Tag.builder()
+                .tenant(TestTenants.DEFAULT)
                 .idTag("RFID-BLOCKED")
                 .customerName("Blocked Customer")
                 .tagType(TagType.RFID)

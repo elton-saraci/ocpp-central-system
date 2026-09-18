@@ -1,6 +1,7 @@
 package com.ocppcentralsystem.config;
 
 import com.ocppcentralsystem.service.ChargePointRegistryService;
+import com.ocppcentralsystem.util.ChargePointIdentity;
 import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.ServerEvents;
 import eu.chargetime.ocpp.model.SessionInformation;
@@ -37,7 +38,7 @@ public class ServerEventConfig {
 			@Override
 			public void newSession(UUID websocketId, SessionInformation information) {
 				try {
-					String cpId = cpIdFrom(information);
+					String cpId = ChargePointIdentity.fromPath(information.getIdentifier());
 					log.info("New Session established, sessionIndex -> {}, sessionIdentifier -> {}", websocketId, cpId);
 
 					if (!chargePointRegistryService.registerSession(cpId, websocketId)) {
@@ -64,14 +65,5 @@ public class ServerEventConfig {
 			}
 
 		};
-	}
-
-	/**
-	 * The identity is the path the station connected to, so {@code wss://host/OCPP16/CP-1} identifies
-	 * itself as {@code CP-1}. It may contain slashes, and the registry keys on it as it is.
-	 */
-	private static String cpIdFrom(SessionInformation information) {
-		String identifier = information.getIdentifier();
-		return identifier != null && identifier.startsWith("/") ? identifier.substring(1) : identifier;
 	}
 }
