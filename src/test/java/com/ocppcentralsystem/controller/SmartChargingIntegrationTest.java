@@ -245,5 +245,4 @@ class SmartChargingIntegrationTest {
         verify(jsonServer).send(any(UUID.class), captor.capture());
         return requestType.cast(captor.getValue());
     }
-
 }

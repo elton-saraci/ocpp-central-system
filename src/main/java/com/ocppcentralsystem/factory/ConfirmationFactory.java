@@ -12,5 +12,4 @@ public class ConfirmationFactory {
         stopTransactionConfirmation.setIdTagInfo(idTagInfo);
         return stopTransactionConfirmation;
     }
-
 }

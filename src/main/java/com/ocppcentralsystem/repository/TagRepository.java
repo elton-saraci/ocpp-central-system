@@ -11,5 +11,4 @@ public interface TagRepository extends JpaRepository<Tag, String>, JpaSpecificat
     Optional<Tag> findByTenantAndIdTag(String tenant, String idTag);
 
     boolean existsByTenantAndIdTag(String tenant, String idTag);
-
 }

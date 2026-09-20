@@ -42,7 +42,7 @@ public final class ChargePointFixtures {
         return station;
     }
 
-    /** A three phase type 2 socket: what most AC stations offer on every connector. */
+    /** A three-phase type 2 socket: what most AC stations offer on every connector. */
     public static Connector connector(int connectorId) {
         return Connector.builder()
                 .connectorId(connectorId)

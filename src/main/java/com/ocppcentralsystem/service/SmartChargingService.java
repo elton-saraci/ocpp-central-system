@@ -168,7 +168,7 @@ public class SmartChargingService {
     }
 
     /**
-     * Charge points expect the limit in amperes, where a three phase charger draws
+     * Charge points expect the limit in amperes, where a three-phase charger draws
      * {@code phases x voltage x I} - so 11 kW is 15.9 A on three phases of 230 V.
      */
     private double toAmperes(int powerW) {

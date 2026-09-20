@@ -101,5 +101,4 @@ public class Tag {
     public boolean isUsable() {
         return TagStatus.ACTIVE.equals(status) && !isExpired();
     }
-
 }

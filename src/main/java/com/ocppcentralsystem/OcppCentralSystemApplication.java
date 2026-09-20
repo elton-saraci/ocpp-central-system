@@ -9,5 +9,4 @@ public class OcppCentralSystemApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(OcppCentralSystemApplication.class, args);
 	}
-
 }

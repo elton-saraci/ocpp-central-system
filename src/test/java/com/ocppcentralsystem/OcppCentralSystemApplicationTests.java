@@ -9,5 +9,4 @@ class OcppCentralSystemApplicationTests {
 	@Test
 	void contextLoads() {
 	}
-
 }

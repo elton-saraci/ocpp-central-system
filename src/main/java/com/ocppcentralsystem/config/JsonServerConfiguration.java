@@ -22,5 +22,4 @@ public class JsonServerConfiguration {
         jsonServer.addFeatureProfile(serverRemoteTriggerProfile);
         return jsonServer;
     }
-
 }

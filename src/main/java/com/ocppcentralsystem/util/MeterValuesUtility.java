@@ -69,5 +69,4 @@ public class MeterValuesUtility {
             return Optional.empty();
         }
     }
-
 }

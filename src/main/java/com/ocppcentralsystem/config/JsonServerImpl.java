@@ -27,5 +27,4 @@ public class JsonServerImpl {
             log.error("Exception while starting the server, error message: {}", e.getLocalizedMessage());
         }
     }
-
 }
