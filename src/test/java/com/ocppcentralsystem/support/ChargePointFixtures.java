@@ -42,6 +42,15 @@ public final class ChargePointFixtures {
         return station;
     }
 
+    /** A station whose connectors describe their own installation. */
+    public static ChargePoint stationWithConnectors(String cpId, Connector... connectors) {
+        ChargePoint station = connectedStation(cpId);
+        for (Connector connector : connectors) {
+            station.addConnector(connector);
+        }
+        return station;
+    }
+
     /** A three-phase type 2 socket: what most AC stations offer on every connector. */
     public static Connector connector(int connectorId) {
         return Connector.builder()
@@ -54,5 +63,17 @@ public final class ChargePointFixtures {
                 .maxElectricPower(11000)
                 .status(ChargePointStatus.Available)
                 .build();
+    }
+
+    /**
+     * A connector that states its own power type and voltage, which is what the watt/ampere
+     * conversion reads. Pass null to leave one of them out and have the configured default stand
+     * in.
+     */
+    public static Connector connector(int connectorId, PowerType powerType, Integer maxVoltage) {
+        Connector connector = connector(connectorId);
+        connector.setPowerType(powerType);
+        connector.setMaxVoltage(maxVoltage);
+        return connector;
     }
 }

@@ -2,6 +2,7 @@ package com.ocppcentralsystem.service;
 
 import com.ocppcentralsystem.exception.ResourceNotFoundException;
 import com.ocppcentralsystem.model.ChargePoint;
+import com.ocppcentralsystem.model.Connector;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import eu.chargetime.ocpp.model.core.*;
 import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageConfirmation;
@@ -11,6 +12,8 @@ import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageStatus;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @AllArgsConstructor
@@ -75,5 +78,13 @@ public class ChargePointService {
     ChargePoint requireChargePoint(String tenant, String cpId) {
         return chargePointRepository.findByTenantAndCpId(tenant, cpId)
                 .orElseThrow(() -> new ResourceNotFoundException("Charge point", cpId));
+    }
+
+    /**
+     * @return the connectors registered on the station, empty when it has none. The power API reads
+     *         the installation a connector describes to convert watts into amperes.
+     */
+    List<Connector> findConnectors(String tenant, String cpId) {
+        return chargePointRepository.findConnectors(tenant, cpId);
     }
 }

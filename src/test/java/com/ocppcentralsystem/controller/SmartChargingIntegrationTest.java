@@ -1,6 +1,8 @@
 package com.ocppcentralsystem.controller;
 
 import com.ocppcentralsystem.mcp.ChargePointMcpTools;
+import com.ocppcentralsystem.model.Connector;
+import com.ocppcentralsystem.model.PowerType;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.support.AbstractMockMvcIntegrationTest;
 import com.ocppcentralsystem.support.ChargePointFixtures;
@@ -108,6 +110,63 @@ class SmartChargingIntegrationTest extends AbstractMockMvcIntegrationTest {
     }
 
     @Test
+    void setPowerOnASinglePhaseConnectorConvertsWithThePhasesOfThatConnector() throws Exception {
+        registerChargePoint(ChargePointFixtures.connector(1, PowerType.AC_1_PHASE, 230));
+        answerWith(_ -> new SetChargingProfileConfirmation(ChargingProfileStatus.Accepted));
+
+        mockMvc.perform(put("/charge-point/power")
+                        .param("cpId", CP_ID)
+                        .param("powerW", "7000")
+                        .param("connectorId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.limitAmps").value(30.4));
+
+        ChargingSchedule schedule = capturedRequest(SetChargingProfileRequest.class)
+                .getCsChargingProfiles().getChargingSchedule();
+        assertEquals(30.4, schedule.getChargingSchedulePeriod()[0].getLimit(), 0.01,
+                "7 kW on one phase of 230 V, not on the three the connector does not have");
+    }
+
+    @Test
+    void setPowerUsesTheVoltageTheConnectorStated() throws Exception {
+        registerChargePoint(ChargePointFixtures.connector(1, PowerType.AC_3_PHASE, 400));
+        answerWith(_ -> new SetChargingProfileConfirmation(ChargingProfileStatus.Accepted));
+
+        mockMvc.perform(put("/charge-point/power")
+                        .param("cpId", CP_ID)
+                        .param("powerW", "11000")
+                        .param("connectorId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.limitAmps").value(9.2));
+    }
+
+    @Test
+    void aLimitOnTheWholeStationIsConvertedForItsMostDemandingConnector() throws Exception {
+        registerChargePoint(
+                ChargePointFixtures.connector(1, PowerType.AC_1_PHASE, 230),
+                ChargePointFixtures.connector(2, PowerType.AC_3_PHASE, 230));
+        answerWith(_ -> new SetChargingProfileConfirmation(ChargingProfileStatus.Accepted));
+
+        mockMvc.perform(put("/charge-point/power").param("cpId", CP_ID).param("powerW", "7000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.connectorId").value(0))
+                .andExpect(jsonPath("$.limitAmps").value(10.1));
+    }
+
+    @Test
+    void aConnectorWithoutAPowerTypeFallsBackToTheConfiguredDefaults() throws Exception {
+        registerChargePoint(ChargePointFixtures.connector(1, null, null));
+        answerWith(_ -> new SetChargingProfileConfirmation(ChargingProfileStatus.Accepted));
+
+        mockMvc.perform(put("/charge-point/power")
+                        .param("cpId", CP_ID)
+                        .param("powerW", "11000")
+                        .param("connectorId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.limitAmps").value(15.9));
+    }
+
+    @Test
     void setPowerReportsAChargePointThatRefusesTheProfile() throws Exception {
         registerChargePoint();
         answerWith(_ -> new SetChargingProfileConfirmation(ChargingProfileStatus.NotSupported));
@@ -185,6 +244,19 @@ class SmartChargingIntegrationTest extends AbstractMockMvcIntegrationTest {
     }
 
     @Test
+    void readingTheLimitOfASinglePhaseConnectorConvertsBackWithItsOwnPhases() throws Exception {
+        registerChargePoint(ChargePointFixtures.connector(1, PowerType.AC_1_PHASE, 230));
+        answerWith(_ -> compositeSchedule(ChargingRateUnitType.A, 32.0));
+
+        mockMvc.perform(get("/charge-point/power").param("cpId", CP_ID).param("connectorId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.periods[0].limit").value(32.0))
+                .andExpect(jsonPath("$.periods[0].powerW").value(7360.0));
+
+        assertEquals(1, capturedRequest(GetCompositeScheduleRequest.class).getConnectorId());
+    }
+
+    @Test
     void theMcpToolSetsTheSameLimitAndReportsTheResult() throws Exception {
         registerChargePoint();
         answerWith(_ -> new SetChargingProfileConfirmation(ChargingProfileStatus.Accepted));
@@ -206,6 +278,11 @@ class SmartChargingIntegrationTest extends AbstractMockMvcIntegrationTest {
 
     private void registerChargePoint() {
         chargePointRepository.save(ChargePointFixtures.connectedStation(CP_ID));
+    }
+
+    /** A station whose connectors describe their own installation. */
+    private void registerChargePoint(Connector... connectors) {
+        chargePointRepository.save(ChargePointFixtures.stationWithConnectors(CP_ID, connectors));
     }
 
     private static GetCompositeScheduleConfirmation compositeSchedule(ChargingRateUnitType unit, Double limit) {

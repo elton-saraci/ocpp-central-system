@@ -16,8 +16,8 @@ public class ChargingSchedulePeriodDTO {
     /** The raw limit the charge point reported, in {@code unit}. */
     private Double limit;
     /**
-     * The same limit in watts. Derived from the configured phases and voltage when the charge
-     * point reports in amperes.
+     * The same limit in watts, derived from the phases and voltage of the connector the schedule
+     * belongs to when the charge point reports in amperes.
      */
     private Double powerW;
 }

@@ -5,6 +5,7 @@ import com.ocppcentralsystem.model.ChargePoint;
 import com.ocppcentralsystem.model.ChargingProfileResultDTO;
 import com.ocppcentralsystem.model.ChargingScheduleDTO;
 import com.ocppcentralsystem.model.ChargingSchedulePeriodDTO;
+import com.ocppcentralsystem.model.Connector;
 import eu.chargetime.ocpp.model.core.ChargingProfile;
 import eu.chargetime.ocpp.model.core.ChargingProfileKindType;
 import eu.chargetime.ocpp.model.core.ChargingProfilePurposeType;
@@ -25,6 +26,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -63,7 +65,7 @@ public class SmartChargingService {
     public ChargingProfileResultDTO setPowerLimit(String tenant, String cpId, Integer connectorId, int powerW, Integer durationMinutes) {
         ChargePoint chargePoint = chargePointService.requireChargePoint(tenant, cpId);
         int target = connectorId == null ? WHOLE_CHARGE_POINT : connectorId;
-        double limitAmps = toAmperes(powerW);
+        double limitAmps = toAmperes(powerW, powerFactors(chargePoint, target));
 
         ChargingProfile profile = getChargingProfile(durationMinutes, limitAmps);
 
@@ -129,6 +131,7 @@ public class SmartChargingService {
     public ChargingScheduleDTO getPowerLimit(String tenant, String cpId, Integer connectorId, Integer durationMinutes) {
         ChargePoint chargePoint = chargePointService.requireChargePoint(tenant, cpId);
         int target = connectorId == null ? WHOLE_CHARGE_POINT : connectorId;
+        PowerFactors factors = powerFactors(chargePoint, target);
         int windowSeconds = durationMinutes != null && durationMinutes > 0
                 ? durationMinutes * SECONDS_PER_MINUTE
                 : DEFAULT_READ_WINDOW_MINUTES * SECONDS_PER_MINUTE;
@@ -148,12 +151,13 @@ public class SmartChargingService {
             ChargingRateUnitType unit = schedule.getChargingRateUnit();
             result.setUnit(unit == null ? null : unit.name());
             result.setDurationSeconds(schedule.getDuration());
-            result.setPeriods(toPeriods(schedule, unit));
+            result.setPeriods(toPeriods(schedule, unit, factors));
         }
         return result;
     }
 
-    private List<ChargingSchedulePeriodDTO> toPeriods(ChargingSchedule schedule, ChargingRateUnitType unit) {
+    private List<ChargingSchedulePeriodDTO> toPeriods(ChargingSchedule schedule, ChargingRateUnitType unit,
+                                                     PowerFactors powerFactors) {
         ChargingSchedulePeriod[] periods = schedule.getChargingSchedulePeriod();
         if (periods == null) {
             return List.of();
@@ -162,34 +166,95 @@ public class SmartChargingService {
             ChargingSchedulePeriodDTO dto = new ChargingSchedulePeriodDTO();
             dto.setStartPeriodSeconds(period.getStartPeriod());
             dto.setLimit(period.getLimit());
-            dto.setPowerW(toWatts(period.getLimit(), unit));
+            dto.setPowerW(toWatts(period.getLimit(), unit, powerFactors));
             return dto;
         }).toList();
     }
 
     /**
-     * Charge points expect the limit in amperes, where a three-phase charger draws
-     * {@code phases x voltage x I} - so 11 kW is 15.9 A on three phases of 230 V.
+     * Resolves how watts become amperes for the target of a limit.
+     *
+     * <p>A limit addresses a connector, and each connector applies the current to its own
+     * installation: 11 kW is 15.9 A on three phases of 230 V, but 47.8 A on a single one. The
+     * connector's {@code powerType} and {@code maxVoltage} say which it is. What a connector does
+     * not describe - an unregistered connector, or a station whose connectors were never filled in
+     * - falls back to the configured defaults.</p>
+     *
+     * <p>{@link #WHOLE_CHARGE_POINT} covers every connector at once, so there the conversion that
+     * yields the lowest current wins: no connector can then draw more than the watts that were
+     * asked for, and the smaller ones merely charge slower. A single connector is converted with
+     * its own values, exactly.</p>
      */
-    private double toAmperes(int powerW) {
-        int phases = applicationConfiguration.getSmartChargingPhases();
-        int voltage = applicationConfiguration.getSmartChargingVoltage();
-        return roundToOneDecimal(powerW / (double) (phases * voltage));
+    private PowerFactors powerFactors(ChargePoint chargePoint, int connectorId) {
+        List<Connector> connectors = chargePointService.findConnectors(chargePoint.getTenant(), chargePoint.getCpId());
+        if (connectorId != WHOLE_CHARGE_POINT) {
+            return connectors.stream()
+                    .filter(connector -> connector.getConnectorId() == connectorId)
+                    .findFirst()
+                    .map(this::powerFactorsOf)
+                    .orElseGet(this::defaultPowerFactors);
+        }
+        return connectors.stream()
+                .map(this::powerFactorsOf)
+                .max(Comparator.comparingInt(PowerFactors::wattsPerAmpere))
+                .orElseGet(this::defaultPowerFactors);
     }
 
-    private Double toWatts(Double limit, ChargingRateUnitType unit) {
+    private PowerFactors powerFactorsOf(Connector connector) {
+        return PowerFactors.of(connector, applicationConfiguration);
+    }
+
+    private PowerFactors defaultPowerFactors() {
+        return PowerFactors.defaults(applicationConfiguration);
+    }
+
+    private double toAmperes(int powerW, PowerFactors powerFactors) {
+        return roundToOneDecimal(powerFactors.toAmperes(powerW));
+    }
+
+    private Double toWatts(Double limit, ChargingRateUnitType unit, PowerFactors powerFactors) {
         if (limit == null || unit == null) {
             return null;
         }
         if (ChargingRateUnitType.W == unit) {
             return limit;
         }
-        int phases = applicationConfiguration.getSmartChargingPhases();
-        int voltage = applicationConfiguration.getSmartChargingVoltage();
-        return roundToOneDecimal(limit * phases * voltage);
+        return roundToOneDecimal(powerFactors.toWatts(limit));
     }
 
     private double roundToOneDecimal(double value) {
         return Math.round(value * 10.0) / 10.0;
+    }
+
+    /**
+     * How one target converts between watts and amperes: {@code P = phases x voltage x I}, where a
+     * charge point applies the current of a three-phase schedule to every phase.
+     *
+     * @param wattsPerAmpere {@code phases x voltage} - the only number both conversions need.
+     */
+    private record PowerFactors(int wattsPerAmpere) {
+
+        static PowerFactors of(Connector connector, ApplicationConfiguration configuration) {
+            int phases = connector.getPowerType() == null
+                    ? configuration.getSmartChargingPhases()
+                    : connector.getPowerType().getPhases();
+            int voltage = connector.getMaxVoltage() == null
+                    ? configuration.getSmartChargingVoltage()
+                    : connector.getMaxVoltage();
+            return new PowerFactors(phases * voltage);
+        }
+
+        static PowerFactors defaults(ApplicationConfiguration configuration) {
+            return new PowerFactors(
+                    configuration.getSmartChargingPhases() * configuration.getSmartChargingVoltage());
+        }
+
+        double toAmperes(int powerW) {
+            return powerW / (double) wattsPerAmpere;
+        }
+
+        double toWatts(double amperes) {
+            return amperes * wattsPerAmpere;
+        }
     }
 }
