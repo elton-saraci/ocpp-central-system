@@ -6,9 +6,8 @@ import com.ocppcentralsystem.model.WebsocketConnectionStatus;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.service.ChargePointRegistryService;
 import com.ocppcentralsystem.service.ChargePointService;
+import com.ocppcentralsystem.support.AbstractMockMvcIntegrationTest;
 import com.ocppcentralsystem.support.ChargePointFixtures;
-import com.ocppcentralsystem.support.TestTenants;
-import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.feature.profile.ServerCoreEventHandler;
 import eu.chargetime.ocpp.model.Confirmation;
 import eu.chargetime.ocpp.model.Request;
@@ -30,14 +29,8 @@ import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageConfirmation;
 import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageRequest;
 import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageRequestType;
 import eu.chargetime.ocpp.model.remotetrigger.TriggerMessageStatus;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -63,19 +56,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Covers charge point registration and inbound state updates, the remote operations triggered
  * from the API, and the HTTP contract of the charge point endpoints.
  *
- * <p>{@link JSONServer} is mocked: the remote operations only make sense against a connected
- * charge point, and mocking the transport avoids binding port 8080 in the test JVM.</p>
+ * <p>The OCPP transport is mocked by {@link AbstractMockMvcIntegrationTest}, so these tests drive
+ * the remote operations against a stub instead of a connected charge point.</p>
  */
-@SpringBootTest
-@Transactional
-@AutoConfigureMockMvc
-class ChargePointIntegrationTest {
+class ChargePointIntegrationTest extends AbstractMockMvcIntegrationTest {
 
     private static final String CP_ID = "CP-1";
-    private static final String TENANT = TestTenants.DEFAULT;
 
-    @Autowired
-    private MockMvc mockMvc;
     @Autowired
     private ChargePointService chargePointService;
     @Autowired
@@ -83,12 +70,7 @@ class ChargePointIntegrationTest {
     @Autowired
     private ChargePointRepository chargePointRepository;
     @Autowired
-    private EntityManager entityManager;
-    @Autowired
     private ServerCoreEventHandler coreEventHandler;
-
-    @MockitoBean
-    private JSONServer jsonServer;
 
     @Test
     void aSessionIsTrackedUntilTheStationDisconnects() {
@@ -258,8 +240,7 @@ class ChargePointIntegrationTest {
     }
 
     private ChargePoint reload() {
-        entityManager.flush();
-        entityManager.clear();
+        flushAndClear();
         return chargePointRepository.findById(CP_ID).orElseThrow();
     }
 

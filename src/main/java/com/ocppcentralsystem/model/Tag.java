@@ -10,8 +10,10 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -22,7 +24,9 @@ import java.time.LocalDateTime;
  * {@code Authorize} and {@code StartTransaction} messages, so it doubles as the
  * primary key. OCPP 1.6 limits the identifier to 20 characters.</p>
  */
-@Data
+@Getter
+@Setter
+@ToString(onlyExplicitlyIncluded = true)
 @Entity
 @Table(name = "tag")
 @Builder
@@ -32,6 +36,7 @@ public class Tag {
 
     @Id
     @Column(nullable = false, length = 20)
+    @ToString.Include
     private String idTag;
 
     /**
@@ -39,6 +44,7 @@ public class Tag {
      * that asked, so the same idTag cannot be shared between tenants.
      */
     @Column(nullable = false, length = 50)
+    @ToString.Include
     private String tenant;
 
     @Column(nullable = false, length = 100)

@@ -7,19 +7,13 @@ import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import com.ocppcentralsystem.repository.TagRepository;
 import com.ocppcentralsystem.mcp.ChargePointMcpTools;
 import com.ocppcentralsystem.service.ChargePointRegistryService;
+import com.ocppcentralsystem.support.AbstractMockMvcIntegrationTest;
 import com.ocppcentralsystem.tenant.TenantResolver;
-import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.feature.profile.ServerCoreEventHandler;
 import eu.chargetime.ocpp.model.core.AuthorizationStatus;
 import eu.chargetime.ocpp.model.core.AuthorizeRequest;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -41,16 +35,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * tenant it likes. What is guaranteed here is that naming a tenant cannot reach another one's
  * rows.</p>
  */
-@SpringBootTest
-@Transactional
-@AutoConfigureMockMvc
-class TenantIsolationIntegrationTest {
+class TenantIsolationIntegrationTest extends AbstractMockMvcIntegrationTest {
 
     private static final String ACME = "acme";
     private static final String BETA = "beta";
 
-    @Autowired
-    private MockMvc mockMvc;
     @Autowired
     private ChargePointRegistryService registry;
     @Autowired
@@ -61,11 +50,6 @@ class TenantIsolationIntegrationTest {
     private ServerCoreEventHandler coreEventHandler;
     @Autowired
     private ChargePointMcpTools chargePointMcpTools;
-    @Autowired
-    private EntityManager entityManager;
-
-    @MockitoBean
-    private JSONServer jsonServer;
 
     @Test
     void aTagIsOnlyVisibleToItsOwnTenant() throws Exception {
@@ -209,7 +193,7 @@ class TenantIsolationIntegrationTest {
         Tag tag = tagRepository.findByTenantAndIdTag(ACME, "RFID-ACME").orElseThrow();
 
         ChargeTransaction transaction = chargeTransactionRepository.save(new ChargeTransaction(station, 1, tag));
-        entityManager.flush();
+        flushAndClear();
         return transaction.getChargeTransactionId();
     }
 }

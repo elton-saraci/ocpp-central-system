@@ -16,8 +16,10 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -32,7 +34,9 @@ import java.time.LocalDateTime;
  * ever need to be published to an OCPI hub, its EVSE grouping would sit between the station and
  * these rows.</p>
  */
-@Data
+@Getter
+@Setter
+@ToString(onlyExplicitlyIncluded = true)
 @Entity
 @Table(name = "connector", uniqueConstraints = @UniqueConstraint(
         name = "uk_connector_station_number", columnNames = {"cp_id", "connector_id"}))
@@ -51,6 +55,7 @@ public class Connector {
 
     /** The OCPP 1.6 connector number, 1 or higher. 0 is the station and never gets a row. */
     @Column(name = "connector_id", nullable = false)
+    @ToString.Include
     private int connectorId;
 
     @Enumerated(EnumType.STRING)
@@ -73,6 +78,7 @@ public class Connector {
 
     @Enumerated(EnumType.STRING)
     @Column(length = 30)
+    @ToString.Include
     private ChargePointStatus status;
 
     @Enumerated(EnumType.STRING)

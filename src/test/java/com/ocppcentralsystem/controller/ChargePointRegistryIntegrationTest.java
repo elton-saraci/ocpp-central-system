@@ -11,8 +11,7 @@ import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import com.ocppcentralsystem.repository.TagRepository;
 import com.ocppcentralsystem.service.ChargePointRegistryService;
 import com.ocppcentralsystem.service.TagService;
-import com.ocppcentralsystem.support.TestTenants;
-import eu.chargetime.ocpp.JSONServer;
+import com.ocppcentralsystem.support.AbstractMockMvcIntegrationTest;
 import eu.chargetime.ocpp.feature.profile.ServerCoreEventHandler;
 import eu.chargetime.ocpp.model.core.BootNotificationConfirmation;
 import eu.chargetime.ocpp.model.core.BootNotificationRequest;
@@ -20,14 +19,8 @@ import eu.chargetime.ocpp.model.core.ChargePointErrorCode;
 import eu.chargetime.ocpp.model.core.ChargePointStatus;
 import eu.chargetime.ocpp.model.core.RegistrationStatus;
 import eu.chargetime.ocpp.model.core.StatusNotificationRequest;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -48,17 +41,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Covers the station registry: the CRUD an operator drives, the connectors stored with a station,
  * and the policy that only a registered, enabled station gets a session.
  */
-@SpringBootTest
-@Transactional
-@AutoConfigureMockMvc
-class ChargePointRegistryIntegrationTest {
+class ChargePointRegistryIntegrationTest extends AbstractMockMvcIntegrationTest {
 
     private static final String CP_ID = "CP-REG-1";
     private static final String TAG_ID = "REG-TAG";
-    private static final String TENANT = TestTenants.DEFAULT;
 
-    @Autowired
-    private MockMvc mockMvc;
     @Autowired
     private ChargePointRegistryService registry;
     @Autowired
@@ -71,11 +58,6 @@ class ChargePointRegistryIntegrationTest {
     private TagRepository tagRepository;
     @Autowired
     private ServerCoreEventHandler coreEventHandler;
-    @Autowired
-    private EntityManager entityManager;
-
-    @MockitoBean
-    private JSONServer jsonServer;
 
     @Test
     void aStationIsRegisteredWithItsConnectorsAndMetadata() throws Exception {
@@ -277,8 +259,7 @@ class ChargePointRegistryIntegrationTest {
                 .andExpect(jsonPath("$.action").value("DELETED"))
                 .andExpect(jsonPath("$.transactionCount").value(0));
 
-        entityManager.flush();
-        entityManager.clear();
+        flushAndClear();
         assertTrue(chargePointRepository.findById(CP_ID).isEmpty());
     }
 
@@ -293,7 +274,7 @@ class ChargePointRegistryIntegrationTest {
                 .andExpect(jsonPath("$.transactionCount").value(1))
                 .andExpect(jsonPath("$.chargePoint.enabled").value(false));
 
-        entityManager.clear();
+        flushAndClear();
         ChargePoint kept = chargePointRepository.findById(CP_ID).orElseThrow();
         assertFalse(kept.isEnabled(), "the station is kept so its transactions still have a parent");
     }
@@ -315,12 +296,11 @@ class ChargePointRegistryIntegrationTest {
         ChargePoint station = chargePointRepository.findById(ChargePointRegistryIntegrationTest.CP_ID).orElseThrow();
         Tag tag = tagRepository.findById(TAG_ID).orElseThrow();
         chargeTransactionRepository.save(new ChargeTransaction(station, 1, tag));
-        entityManager.flush();
+        flushAndClear();
     }
 
     private ChargePoint reload() {
-        entityManager.flush();
-        entityManager.clear();
+        flushAndClear();
         return chargePointRepository.findById(CP_ID).orElseThrow();
     }
 }

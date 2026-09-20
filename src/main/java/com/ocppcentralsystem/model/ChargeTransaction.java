@@ -1,19 +1,30 @@
 package com.ocppcentralsystem.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 
-@Data
+/**
+ * One charging session, from the OCPP StartTransaction to the StopTransaction.
+ *
+ * <p>The identifier is the one-handed to the charge point, so it is generated here and stays an
+ * {@code int}.</p>
+ */
+@Getter
+@Setter
+@ToString(onlyExplicitlyIncluded = true)
 @Entity
 @NoArgsConstructor
 public class ChargeTransaction {
 
     @Id
     @Column(nullable = false)
+    @ToString.Include
     private int chargeTransactionId;
 
     /**

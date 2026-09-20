@@ -11,10 +11,9 @@ import com.ocppcentralsystem.model.TagType;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import com.ocppcentralsystem.repository.TagRepository;
+import com.ocppcentralsystem.support.AbstractIntegrationTest;
 import com.ocppcentralsystem.support.ChargePointFixtures;
-import com.ocppcentralsystem.support.TestTenants;
 import com.ocppcentralsystem.util.MeterValuesUtility;
-import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.feature.profile.ServerCoreEventHandler;
 import eu.chargetime.ocpp.model.Confirmation;
 import eu.chargetime.ocpp.model.Request;
@@ -32,12 +31,8 @@ import eu.chargetime.ocpp.model.core.StartTransactionConfirmation;
 import eu.chargetime.ocpp.model.core.StartTransactionRequest;
 import eu.chargetime.ocpp.model.core.StopTransactionConfirmation;
 import eu.chargetime.ocpp.model.core.StopTransactionRequest;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -60,16 +55,12 @@ import static org.mockito.Mockito.when;
  * Covers the whole transaction lifecycle: the inbound OCPP messages a charge point sends
  * (authorize, start, meter values, stop) and the outbound remote start/stop.
  *
- * <p>The OCPP handlers are plain objects, so they can be driven directly. The transport is
- * replaced with a mock - {@link JSONServer} is only used to send requests out and to open the
- * listening socket, and mocking it also keeps the test from binding port 8080.</p>
+ * <p>The OCPP handlers are plain objects, so they can be driven directly. The transport is mocked
+ * by {@link AbstractIntegrationTest}, which also keeps the test from binding port 8080.</p>
  */
-@SpringBootTest
-@Transactional
-class ChargeTransactionIntegrationTest {
+class ChargeTransactionIntegrationTest extends AbstractIntegrationTest {
 
     private static final String CP_ID = "CP-TX-1";
-    private static final String TENANT = TestTenants.DEFAULT;
 
     @Autowired
     private ChargeTransactionService chargeTransactionService;
@@ -80,12 +71,7 @@ class ChargeTransactionIntegrationTest {
     @Autowired
     private TagRepository tagRepository;
     @Autowired
-    private EntityManager entityManager;
-    @Autowired
     private ServerCoreEventHandler coreEventHandler;
-
-    @MockitoBean
-    private JSONServer jsonServer;
 
     private UUID websocketId;
 
@@ -317,8 +303,7 @@ class ChargeTransactionIntegrationTest {
      * so the session has to be flushed and cleared before reading the stored row back.
      */
     private ChargeTransaction reloadTransaction(int transactionId) {
-        entityManager.flush();
-        entityManager.clear();
+        flushAndClear();
         return chargeTransactionRepository.findById(transactionId).orElseThrow();
     }
 

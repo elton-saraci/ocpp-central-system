@@ -15,13 +15,10 @@ import com.ocppcentralsystem.model.TagType;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.ChargeTransactionRepository;
 import com.ocppcentralsystem.repository.TagRepository;
+import com.ocppcentralsystem.support.AbstractIntegrationTest;
 import com.ocppcentralsystem.support.ChargePointFixtures;
-import com.ocppcentralsystem.support.TestTenants;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,11 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Verifies that tags are stored, that transactions reference them through a real
  * foreign key, and that removing a tag never orphans transaction history.
  */
-@SpringBootTest
-@Transactional
-class TagServiceIntegrationTest {
-
-    private static final String TENANT = TestTenants.DEFAULT;
+class TagServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private TagService tagService;
@@ -51,8 +44,6 @@ class TagServiceIntegrationTest {
     private ChargeTransactionRepository chargeTransactionRepository;
     @Autowired
     private ChargeTransactionMapper chargeTransactionMapper;
-    @Autowired
-    private EntityManager entityManager;
 
     @Test
     void transactionReferencesTagAndTagIsBlockedInsteadOfDeleted() {
@@ -63,8 +54,7 @@ class TagServiceIntegrationTest {
 
         Tag tag = tagRepository.findById("RFID-TEST").orElseThrow();
         chargeTransactionRepository.save(new ChargeTransaction(chargePoint, 1, tag));
-        entityManager.flush();
-        entityManager.clear();
+        flushAndClear();
 
         List<ChargeTransaction> transactions = chargeTransactionRepository
                 .findByTenantAndTag_IdTagOrderByLastUpdatedDesc(TENANT, "RFID-TEST");
@@ -136,8 +126,7 @@ class TagServiceIntegrationTest {
         LocalDateTime stale = LocalDateTime.of(2000, 1, 1, 0, 0);
         managed.setCustomerName("Renamed Customer");
         managed.setLastUpdated(stale);
-        entityManager.flush();
-        entityManager.clear();
+        flushAndClear();
 
         Tag reloaded = tagRepository.findById("STAMP-TEST").orElseThrow();
         assertEquals("Renamed Customer", reloaded.getCustomerName());

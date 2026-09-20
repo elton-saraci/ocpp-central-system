@@ -5,17 +5,12 @@ import com.ocppcentralsystem.model.TagStatus;
 import com.ocppcentralsystem.model.TagType;
 import com.ocppcentralsystem.repository.ChargePointRepository;
 import com.ocppcentralsystem.repository.TagRepository;
+import com.ocppcentralsystem.support.AbstractMockMvcIntegrationTest;
 import com.ocppcentralsystem.support.ChargePointFixtures;
 import com.ocppcentralsystem.support.TestTenants;
-import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.model.Request;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -33,25 +28,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Pins down the error contract: every failing request answers with the same
  * {@code ApiErrorResponse} envelope, a status that says who is at fault, and a stable code.
  *
- * <p>Deliberately uses the same annotations as {@link ChargePointIntegrationTest} so both classes
- * share one Spring context.</p>
+ * <p>Extends the same base as {@link ChargePointIntegrationTest}, so both classes share one Spring
+ * context.</p>
  */
-@SpringBootTest
-@Transactional
-@AutoConfigureMockMvc
-class ApiErrorHandlingIntegrationTest {
+class ApiErrorHandlingIntegrationTest extends AbstractMockMvcIntegrationTest {
 
     private static final String CP_ID = "CP-ERR-1";
 
     @Autowired
-    private MockMvc mockMvc;
-    @Autowired
     private ChargePointRepository chargePointRepository;
     @Autowired
     private TagRepository tagRepository;
-
-    @MockitoBean
-    private JSONServer jsonServer;
 
     @Test
     void unknownTagIsReportedWithItsCode() throws Exception {

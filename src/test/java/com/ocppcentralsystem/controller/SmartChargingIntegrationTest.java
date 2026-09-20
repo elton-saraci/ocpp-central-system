@@ -2,8 +2,8 @@ package com.ocppcentralsystem.controller;
 
 import com.ocppcentralsystem.mcp.ChargePointMcpTools;
 import com.ocppcentralsystem.repository.ChargePointRepository;
+import com.ocppcentralsystem.support.AbstractMockMvcIntegrationTest;
 import com.ocppcentralsystem.support.ChargePointFixtures;
-import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.model.Confirmation;
 import eu.chargetime.ocpp.model.Request;
 import eu.chargetime.ocpp.model.core.ChargingProfile;
@@ -24,11 +24,6 @@ import eu.chargetime.ocpp.model.smartcharging.SetChargingProfileRequest;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -53,22 +48,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>Carries the same annotations as {@link ChargePointIntegrationTest} so both share one Spring
  * context.</p>
  */
-@SpringBootTest
-@Transactional
-@AutoConfigureMockMvc
-class SmartChargingIntegrationTest {
+class SmartChargingIntegrationTest extends AbstractMockMvcIntegrationTest {
 
     private static final String CP_ID = "CP-POWER-1";
 
     @Autowired
-    private MockMvc mockMvc;
-    @Autowired
     private ChargePointRepository chargePointRepository;
     @Autowired
     private ChargePointMcpTools chargePointMcpTools;
-
-    @MockitoBean
-    private JSONServer jsonServer;
 
     @Test
     void setPowerBuildsATxDefaultProfileInAmperes() throws Exception {

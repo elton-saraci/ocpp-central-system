@@ -12,8 +12,10 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -37,7 +39,9 @@ import java.util.UUID;
  * else descriptive an operator wants to record goes in {@link #metadata}, so new fields need no
  * schema change.</p>
  */
-@Data
+@Getter
+@Setter
+@ToString(onlyExplicitlyIncluded = true)
 @Entity
 @Table(name = "charge_point")
 @Builder
@@ -52,6 +56,7 @@ public class ChargePoint {
      */
     @Id
     @Column(nullable = false, length = 100)
+    @ToString.Include
     private String cpId;
 
     /**
@@ -59,6 +64,7 @@ public class ChargePoint {
      * inherits the tenant of the station it connected as.
      */
     @Column(nullable = false, length = 50)
+    @ToString.Include
     private String tenant;
 
     /** Label an operator can set; OCPP has no notion of a station name. */
