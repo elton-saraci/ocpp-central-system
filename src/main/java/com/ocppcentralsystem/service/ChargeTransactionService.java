@@ -2,6 +2,7 @@ package com.ocppcentralsystem.service;
 
 import com.ocppcentralsystem.exception.ResourceNotFoundException;
 import com.ocppcentralsystem.exception.TagNotAuthorizedException;
+import com.ocppcentralsystem.factory.ChargeTransactionFactory;
 import com.ocppcentralsystem.mapper.ChargeTransactionMapper;
 import com.ocppcentralsystem.model.ChargePoint;
 import com.ocppcentralsystem.model.ChargeTransaction;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static eu.chargetime.ocpp.model.core.RemoteStartStopStatus.Rejected;
@@ -60,6 +62,72 @@ public class ChargeTransactionService {
             chargeTransaction.setActive(false);
         }
         return chargeTransactionRepository.save(chargeTransaction);
+    }
+
+    /**
+     * Continues the transaction this session is already running for the tag, for a station that
+     * repeats its StartTransaction instead of opening a second one.
+     *
+     * @return the transaction id, or empty when the session has nothing running for that tag.
+     */
+    @Transactional
+    public Optional<Integer> continueRunningTransaction(UUID websocketId, StartTransactionRequest request) {
+        return chargeTransactionRepository.findLatestByWebsocketIdAndIdTag(websocketId, request.getIdTag())
+                .map(transaction -> {
+                    ChargeTransaction updated = ChargeTransactionFactory
+                            .updateChargeTransactionBasedOnRequest(transaction, request);
+                    log.info("Updated ChargeTransaction {} with connectorId {} and meterStart {}",
+                            updated.getChargeTransactionId(), request.getConnectorId(), request.getMeterStart());
+                    return chargeTransactionRepository.save(updated).getChargeTransactionId();
+                });
+    }
+
+    /** Stores a transaction the station started itself and returns the id it was given. */
+    @Transactional
+    public int recordStartedTransaction(ChargePoint chargePoint, Tag tag, StartTransactionRequest request) {
+        ChargeTransaction chargeTransaction = ChargeTransactionFactory
+                .createNewChargingTransactionFromStart(request, chargePoint, tag);
+        int transactionId = chargeTransactionRepository.save(chargeTransaction).getChargeTransactionId();
+        log.info("Created ChargeTransaction {} for idTag {}", transactionId, request.getIdTag());
+        return transactionId;
+    }
+
+    /**
+     * Records the values a station reported for a transaction it is running. The entity is loaded and
+     * changed rather than updated in bulk, so {@code lastUpdated} is stamped by the entity itself.
+     *
+     * @return {@code false} when this tenant has no transaction with that id.
+     */
+    @Transactional
+    public boolean recordMeterValues(String tenant, int transactionId, Integer meterValue, Integer powerValue,
+                                     Integer connectorId) {
+        return chargeTransactionRepository.findByTenantAndChargeTransactionId(tenant, transactionId)
+                .map(transaction -> {
+                    transaction.setLatestMeterValue(meterValue);
+                    transaction.setLatestPowerValue(powerValue);
+                    transaction.setConnectorId(connectorId);
+                    chargeTransactionRepository.save(transaction);
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    /**
+     * Marks a transaction as stopped with the reading the station sent.
+     *
+     * @return {@code false} when this tenant has no transaction with that id.
+     */
+    @Transactional
+    public boolean recordStop(String tenant, int transactionId, Integer meterStop) {
+        return chargeTransactionRepository.findByTenantAndChargeTransactionId(tenant, transactionId)
+                .map(transaction -> {
+                    transaction.setMeterStop(meterStop);
+                    transaction.setLatestMeterValue(meterStop);
+                    transaction.setActive(false);
+                    chargeTransactionRepository.save(transaction);
+                    return true;
+                })
+                .orElse(false);
     }
 
     /**

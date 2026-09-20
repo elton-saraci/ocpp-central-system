@@ -1,5 +1,6 @@
 package com.ocppcentralsystem.config;
 
+import com.ocppcentralsystem.ocpp.OcppCoreHandler;
 import eu.chargetime.ocpp.JSONServer;
 import eu.chargetime.ocpp.feature.profile.ServerCoreProfile;
 import eu.chargetime.ocpp.feature.profile.ServerRemoteTriggerProfile;
@@ -14,8 +15,8 @@ public class JsonServerConfiguration {
     Setting up the required server profiles: Smart Charging and Remote Trigger
      */
     @Bean
-    public JSONServer jsonServer(ServerCoreProfile core) {
-        JSONServer jsonServer = new JSONServer(core);
+    public JSONServer jsonServer(OcppCoreHandler coreHandler) {
+        JSONServer jsonServer = new JSONServer(new ServerCoreProfile(coreHandler));
         ServerSmartChargingProfile serverSmartChargingProfile = new ServerSmartChargingProfile();
         ServerRemoteTriggerProfile serverRemoteTriggerProfile = new ServerRemoteTriggerProfile();
         jsonServer.addFeatureProfile(serverSmartChargingProfile);

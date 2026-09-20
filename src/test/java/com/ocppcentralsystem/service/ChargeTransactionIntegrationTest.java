@@ -299,8 +299,8 @@ class ChargeTransactionIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
-     * The transaction handlers write with bulk JPQL updates that bypass the persistence context,
-     * so the session has to be flushed and cleared before reading the stored row back.
+     * Reads the stored row back from the database rather than from the persistence context, so the
+     * assertions see what was actually written.
      */
     private ChargeTransaction reloadTransaction(int transactionId) {
         flushAndClear();
