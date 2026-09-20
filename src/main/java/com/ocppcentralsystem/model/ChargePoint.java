@@ -99,7 +99,13 @@ public class ChargePoint {
     /** Heartbeat interval handed to the station on BootNotification, in seconds. */
     private Integer heartbeatIntervalSeconds;
 
+    /**
+     * The session handle the OCPP transport gave this station while it is connected, stored as text
+     * to match the {@code VARCHAR(36)} column - binding it as a native uuid makes Postgres reject
+     * every session lookup. Null while the station is offline.
+     */
     @Column(columnDefinition = "VARCHAR(36)")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID websocketId;
 
     @Enumerated(EnumType.STRING)
