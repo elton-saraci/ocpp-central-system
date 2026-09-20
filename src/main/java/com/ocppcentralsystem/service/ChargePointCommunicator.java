@@ -1,14 +1,14 @@
 package com.ocppcentralsystem.service;
 
 import com.ocppcentralsystem.exception.ChargePointCommunicationException;
-import eu.chargetime.ocpp.JSONServer;
+import eu.chargetime.ocpp.IServerAPI;
 import eu.chargetime.ocpp.NotConnectedException;
 import eu.chargetime.ocpp.OccurenceConstraintException;
 import eu.chargetime.ocpp.UnsupportedFeatureException;
 import eu.chargetime.ocpp.model.Confirmation;
 import eu.chargetime.ocpp.model.Request;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -23,11 +23,20 @@ import java.util.concurrent.ExecutionException;
  * either get a confirmation or a failure the API can report.</p>
  */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class ChargePointCommunicator {
 
-    private final JSONServer jsonServer;
+    private final IServerAPI jsonServer;
+
+    /**
+     * The transport is resolved on the first request instead of at startup. It is assembled from
+     * the handler that answers requests - transport, core profile, handler, services, this class -
+     * so asking for it here would close a construction cycle. Nothing is sent while the context is
+     * still starting, which is why deferring it costs nothing.
+     */
+    public ChargePointCommunicator(@Lazy IServerAPI jsonServer) {
+        this.jsonServer = jsonServer;
+    }
 
     public <T extends Confirmation> T send(UUID websocketId, Request request, Class<T> expectedConfirmation) {
         String requestName = request.getClass().getSimpleName();
